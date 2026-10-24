@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-After a day of working with AI agents, dotjar picks out **the ways of thinking worth keeping for the long run** and drops them, one at a time, into a jar. It runs in your browser, or as a sheet of frosted glass over your desktop.
+After a day of working with AI agents, dotjar picks out **the ways of thinking worth keeping for the long run** and drops them, one at a time, into a jar. It runs in your browser, or as a sheet of frosted glass over your desktop; if you like desktop pets, the crab in [clawd-insights](https://github.com/yx0716/clawd-insights) picks up the dots with you.
 
 It doesn't replay what each conversation did. It first lays the day out as a trickle of dots running down the page (what you worked on, when, what each thing turned up that is worth keeping, and which part was your own call), then hands you, one at a time, the things that would still help on another project three months from now, and asks whether to keep them.
 
