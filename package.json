@@ -8,6 +8,13 @@
   "bin": {
     "dotjar": "bin/dotjar.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "assets",
+    "README.md",
+    "README.en.md"
+  ],
   "scripts": {
     "start": "node bin/dotjar.js web",
     "stop": "node bin/dotjar.js stop",
