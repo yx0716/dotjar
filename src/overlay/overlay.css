@@ -1,0 +1,1275 @@
+/* The veil: frosted glass over whatever is on screen, light or dark with the
+   system. Each view does one thing: the day as a stream running down, then one
+   candidate at a time on a glass slab, then the list of what is kept.
+   The four kinds of thing worth keeping take four printing-ink colours. */
+
+:root {
+  --veil: 244 246 250;
+  --veil-top: 0.46;
+  --veil-bottom: 0.74;
+  --ink: rgb(0 0 0 / 0.9);
+  --soft: rgb(0 0 0 / 0.6);
+  --faint: rgb(0 0 0 / 0.36);
+  --line: rgb(0 0 0 / 0.08);
+  --fill: rgb(0 0 0 / 0.055);
+  --fill-strong: rgb(0 0 0 / 0.1);
+  --glass: rgb(255 255 255 / 0.7);
+  --glass-edge: rgb(255 255 255 / 0.95);
+  --glass-shadow: 0 44px 100px -28px rgb(22 28 48 / 0.34), 0 2px 8px rgb(22 28 48 / 0.07);
+  --solid: #0c0d10;
+  --on-solid: #fff;
+
+  --note: #2f6bff;
+  --rule: #f0349a;
+  --skill: #00a878;
+  --memory: #f29d00;
+
+  --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --round: ui-rounded, "SF Pro Rounded", var(--sans);
+
+  --gutter: clamp(24px, 4vw, 64px);
+  --card-w: min(800px, 100vw - 2 * var(--gutter));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --veil: 9 10 13;
+    --veil-top: 0.5;
+    --veil-bottom: 0.78;
+    --ink: rgb(255 255 255 / 0.95);
+    --soft: rgb(255 255 255 / 0.62);
+    --faint: rgb(255 255 255 / 0.38);
+    --line: rgb(255 255 255 / 0.1);
+    --fill: rgb(255 255 255 / 0.075);
+    --fill-strong: rgb(255 255 255 / 0.14);
+    --glass: rgb(32 34 41 / 0.66);
+    --glass-edge: rgb(255 255 255 / 0.17);
+    --glass-shadow: 0 44px 100px -28px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.3);
+    --solid: #fff;
+    --on-solid: #0c0d10;
+
+    --note: #6b9bff;
+    --rule: #ff6db5;
+    --skill: #2fd6a3;
+    --memory: #ffc53d;
+    --aura: 0.34;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  /* A sideways swipe turns a card; it must not also go back in history. */
+  overscroll-behavior: none;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+[data-kind="note"] {
+  --k: var(--note);
+}
+[data-kind="rule"] {
+  --k: var(--rule);
+}
+[data-kind="skill"] {
+  --k: var(--skill);
+}
+[data-kind="memory"] {
+  --k: var(--memory);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ the veil */
+
+.veil,
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+
+.veil {
+  background: linear-gradient(to bottom, rgb(var(--veil) / var(--veil-top)), rgb(var(--veil) / var(--veil-bottom)));
+}
+
+/* Outside the desktop app there is no screen behind the window, so the demo
+   paints a stand-in desktop and blurs it the way the system would. */
+.backdrop {
+  display: none;
+}
+.demo .backdrop {
+  display: block;
+  z-index: -2;
+  background:
+    linear-gradient(#fdfdfd, #fdfdfd) 10% 24% / 36% 58% no-repeat,
+    linear-gradient(#1d2029, #1d2029) 66% 38% / 46% 66% no-repeat,
+    linear-gradient(#ffd166, #ffd166) 94% 88% / 18% 22% no-repeat,
+    radial-gradient(55% 65% at 16% 14%, #5b8def, transparent 70%),
+    radial-gradient(45% 55% at 90% 10%, #ef6fa8, transparent 70%),
+    radial-gradient(70% 70% at 55% 100%, #35c4a0, transparent 70%), #8b93a7;
+}
+.demo .veil {
+  backdrop-filter: blur(56px) saturate(1.5);
+}
+
+/* In a browser tab the page is its own surface: no desktop to veil, so the
+   glass sits over soft fields of the four ink colours instead. */
+.web .backdrop {
+  display: block;
+  z-index: -2;
+  background:
+    radial-gradient(42% 52% at 12% 18%, color-mix(in srgb, var(--note) 62%, transparent), transparent 72%),
+    radial-gradient(38% 46% at 88% 14%, color-mix(in srgb, var(--rule) 52%, transparent), transparent 72%),
+    radial-gradient(46% 50% at 78% 96%, color-mix(in srgb, var(--memory) 50%, transparent), transparent 72%),
+    radial-gradient(44% 48% at 18% 98%, color-mix(in srgb, var(--skill) 50%, transparent), transparent 72%),
+    rgb(var(--veil));
+}
+.web .veil {
+  backdrop-filter: blur(70px) saturate(1.3);
+}
+
+/* -------------------------------------------------------------- top bar */
+
+.bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: clamp(18px, 3.4vh, 34px) var(--gutter) 0;
+}
+
+/* The date opens a calendar of the month. */
+.when {
+  position: relative;
+  justify-self: start;
+}
+.date {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: -12px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-weight: 500;
+  color: var(--soft);
+}
+.date:hover,
+.date[aria-expanded="true"] {
+  background: var(--fill);
+  color: var(--ink);
+}
+.chev {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  opacity: 0.6;
+  transition: transform 0.15s;
+}
+.date[aria-expanded="true"] .chev {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.cal {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 10px);
+  left: -14px;
+  width: 400px;
+  padding: 16px 16px 14px;
+  border-radius: 24px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-edge);
+  backdrop-filter: blur(30px) saturate(1.6);
+  animation: drop-in 0.16s ease-out;
+}
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title {
+  font-weight: 600;
+}
+.cal-nav {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+.cal-nav:hover:not(:disabled) {
+  background: var(--fill);
+}
+.cal-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.cal-nav::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-left: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: translate(-30%, -50%) rotate(45deg);
+}
+.cal-nav.is-next::before {
+  transform: translate(-70%, -50%) rotate(-135deg);
+}
+.cal-week,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.cal-week span {
+  padding-bottom: 4px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--faint);
+}
+.cal-grid.is-loading .cell {
+  opacity: 0.45;
+}
+.cell {
+  position: relative;
+  height: 54px;
+  border-radius: 12px;
+}
+.cell.has-work {
+  background: var(--fill);
+}
+.cell-day {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 5px 5px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--faint);
+}
+.cell.has-work .cell-day {
+  color: var(--ink);
+}
+.cell-day b {
+  min-width: 22px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font: 600 14px/22px var(--round);
+  text-align: center;
+}
+.cell-day small {
+  max-width: 100%;
+  padding-left: 3px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: var(--soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell-day small.is-open {
+  color: var(--note);
+  font-weight: 600;
+}
+.cell-day:hover:not(:disabled) {
+  background: var(--fill-strong);
+}
+.cell.is-today .cell-day b {
+  background: var(--solid);
+  color: var(--on-solid);
+}
+.cell.is-current {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--note) 70%, transparent);
+}
+.cell.is-future .cell-day {
+  opacity: 0.35;
+  cursor: default;
+}
+/* Top right of a day with records: tick it to go through it with others. */
+.tick {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1.5px solid var(--faint);
+  border-radius: 50%;
+  background: transparent;
+}
+.tick:hover {
+  border-color: var(--ink);
+}
+.tick.is-on {
+  border-color: var(--solid);
+  background: var(--solid);
+}
+.tick.is-on::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+  border-right: 1.5px solid var(--on-solid);
+  border-bottom: 1.5px solid var(--on-solid);
+  transform: rotate(45deg);
+}
+.cal-note {
+  margin: 12px 2px 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--soft);
+}
+.cal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.cal-foot .btn {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+.cal-foot .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cal-foot .link {
+  font-size: 13.5px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--fill);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--soft);
+}
+.tab b {
+  font: 600 13.5px/1 var(--round);
+  color: var(--faint);
+}
+.tab[aria-selected="true"] {
+  background: var(--glass);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), inset 0 0 0 1px var(--glass-edge);
+  color: var(--ink);
+}
+.tab[aria-selected="true"] b {
+  color: var(--soft);
+}
+
+.tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--soft);
+}
+.tool:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+
+kbd {
+  min-width: 21px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--fill-strong);
+  font: 500 11.5px/19px var(--sans);
+  text-align: center;
+  color: var(--soft);
+}
+
+:focus {
+  outline: none;
+}
+/* A soft ring for keyboard focus; never a heavy black frame. */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--note) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------ the stage */
+
+.stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  /* One cell that cannot outgrow the stage, so a long draft scrolls inside
+     its card instead of pushing the card over the rows below. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: clamp(14px, 3vh, 34px) var(--gutter) 0;
+}
+
+/* Light in the colour of the current card's kind, seen through the glass. */
+.aura {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: calc(var(--card-w) * 0.86);
+  height: 62%;
+  border-radius: 50%;
+  background: var(--k, transparent);
+  opacity: var(--aura, 0.5);
+  filter: blur(90px);
+  transform: translate(-50%, -50%);
+  transition: background-color 0.5s ease;
+  pointer-events: none;
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  width: var(--card-w);
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(22px, 3.2vh, 36px) clamp(24px, 3vw, 44px) clamp(20px, 2.8vh, 30px);
+  border-radius: 34px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-edge);
+  backdrop-filter: blur(30px) saturate(1.6);
+}
+
+/* The cards before and after this one, just visible at the edges. */
+.peek {
+  position: absolute;
+  top: 50%;
+  width: var(--card-w);
+  height: min(58%, 420px);
+  padding: 34px 40px;
+  border: 0;
+  border-radius: 34px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+  text-align: left;
+  opacity: 0.42;
+  overflow: hidden;
+  transition: opacity 0.16s;
+}
+.peek:hover {
+  opacity: 0.7;
+}
+/* Scaled about their centre, so a card turning into a peek (or back) can be
+   moved as one box; the offset keeps the same gap to the card. */
+.peek.is-prev {
+  right: calc(50% + var(--card-w) / 2 - var(--card-w) * 0.03 + 22px);
+  transform: translateY(-50%) scale(0.94);
+  text-align: right;
+}
+.peek.is-next {
+  left: calc(50% + var(--card-w) / 2 - var(--card-w) * 0.03 + 22px);
+  transform: translateY(-50%) scale(0.94);
+}
+.peek-title {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.peek .dot {
+  display: inline-block;
+  margin-bottom: 14px;
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--k);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  color: var(--soft);
+}
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.carried {
+  flex: none;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--fill-strong);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.from {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* One pip per candidate still waiting, coloured by kind. */
+.pips {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.pip {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--k);
+  opacity: 0.28;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.pip:hover {
+  opacity: 0.7;
+}
+.pip.is-on {
+  opacity: 1;
+  transform: scale(1.5);
+}
+
+/* Either side of the card: turn to the one before or after. */
+.nav {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--glass);
+  box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.3), inset 0 0 0 1px var(--glass-edge);
+  transform: translateY(-50%);
+  transition: transform 0.12s;
+}
+.nav:hover {
+  transform: translateY(-50%) scale(1.08);
+}
+.nav.is-prev {
+  left: max(6px, calc(50% - var(--card-w) / 2 - 22px));
+}
+.nav.is-next {
+  right: max(6px, calc(50% - var(--card-w) / 2 - 22px));
+}
+.nav::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-left: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  transform: translate(-30%, -50%) rotate(45deg);
+}
+.nav.is-next::before {
+  transform: translate(-70%, -50%) rotate(-135deg);
+}
+
+.card-title {
+  margin: 18px 0 0;
+  font-size: clamp(27px, 2.5vw, 36px);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+.card-title.is-long {
+  font-size: clamp(24px, 2.1vw, 30px);
+}
+/* A title breaks between its phrases before it breaks inside one. A phrase
+   too long for the line gives that up and flows like ordinary text. */
+.ph {
+  display: inline-block;
+}
+.ph.is-flowing {
+  display: inline;
+}
+
+.payoff {
+  margin: 12px 0 0;
+  color: var(--soft);
+}
+.payoff b {
+  margin-right: 10px;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.md {
+  flex: 1;
+  min-height: 0;
+  margin-top: 20px;
+  padding: 20px 14px 24px 0;
+  border-top: 1px solid var(--line);
+  overflow-y: auto;
+  line-height: 1.82;
+  user-select: text;
+  cursor: text;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md pre {
+  margin: 0 0 0.85em;
+  max-width: 44em;
+}
+.md strong {
+  font-weight: 600;
+}
+.md h4 {
+  margin: 1.2em 0 0.4em;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.md ul,
+.md ol {
+  padding-left: 1.5em;
+}
+.md li {
+  margin-bottom: 0.25em;
+}
+.md code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--fill);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.87em;
+}
+.md pre {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--fill);
+  overflow-x: auto;
+}
+.md pre code {
+  padding: 0;
+  background: none;
+}
+.md blockquote {
+  padding-left: 14px;
+  border-left: 3px solid var(--line);
+  color: var(--soft);
+}
+.md .table {
+  margin: 0 0 0.9em;
+  overflow-x: auto;
+}
+.md table {
+  border-collapse: collapse;
+  font-size: 0.92em;
+  line-height: 1.6;
+}
+.md th,
+.md td {
+  padding: 6px 14px 6px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.md th {
+  font-weight: 600;
+  color: var(--soft);
+}
+
+.card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill);
+  font-weight: 500;
+  transition: background 0.12s, transform 0.12s;
+}
+.btn:hover {
+  background: var(--fill-strong);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn.primary {
+  background: var(--solid);
+  color: var(--on-solid);
+}
+.btn.primary kbd {
+  background: rgb(127 127 127 / 0.32);
+  color: inherit;
+}
+.btn.primary:hover {
+  background: var(--solid);
+  filter: brightness(1.25) contrast(0.92);
+}
+
+.dest {
+  margin-left: auto;
+  font-size: 13.5px;
+  color: var(--faint);
+}
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--soft);
+  text-decoration: underline;
+  text-decoration-color: var(--faint);
+  text-underline-offset: 3px;
+}
+.link:hover {
+  color: var(--ink);
+}
+.dest .link {
+  margin-left: 8px;
+}
+
+/* A card that asks for one thing, or says there is nothing to decide. */
+.card.is-lead {
+  width: min(620px, 100vw - 2 * var(--gutter));
+  padding-top: clamp(30px, 5vh, 52px);
+  padding-bottom: clamp(28px, 4.4vh, 44px);
+}
+.card.is-lead .card-title {
+  margin-top: 0;
+}
+.lead-text {
+  margin: 16px 0 26px;
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--soft);
+}
+.lead-text:last-child {
+  margin-bottom: 0;
+}
+.lead-error {
+  margin: 16px 0 24px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--fill);
+  user-select: text;
+}
+
+/* While the model reads: four dots dropping in turn. */
+.settling {
+  display: flex;
+  gap: 9px;
+  height: 34px;
+  align-items: flex-end;
+}
+.settling i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--k);
+  animation: drop 1.5s cubic-bezier(0.5, 0, 0.8, 0.4) infinite;
+}
+.settling i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.settling i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+.settling i:nth-child(4) {
+  animation-delay: 0.48s;
+}
+@keyframes drop {
+  0% {
+    transform: translateY(-24px);
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  46%,
+  78% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
+/* What settled today, as a list. */
+.card.is-list {
+  padding-bottom: 14px;
+}
+.rows {
+  flex: 1;
+  min-height: 0;
+  margin: 18px -14px 0;
+  padding: 0 0 10px;
+  list-style: none;
+  overflow-y: auto;
+}
+.row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 14px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  text-align: left;
+}
+.row:hover {
+  background: var(--fill);
+}
+.row .dot {
+  align-self: start;
+  margin-top: 0.5em;
+}
+.row-title {
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.row-where {
+  max-width: 22em;
+  font-size: 13.5px;
+  color: var(--faint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- status line */
+
+.status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  margin: clamp(10px, 1.8vh, 18px) var(--gutter) 0;
+  font-size: 13.5px;
+  color: var(--soft);
+  text-align: center;
+}
+.status.is-toast {
+  color: var(--ink);
+  font-weight: 500;
+}
+.status .is-warn {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ----------------------------------------------------------- the stream */
+
+/* The first view: the day as a stream running down the page, morning at the
+   top. Each thing worked on sits beside it where it happened in the day. Its
+   dot is solid at the core for the person's own calls and an open ring for
+   what an agent did; the two little tags under each use the same two fills. */
+.overview {
+  width: min(1120px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.overview-title {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 44px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.overview-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 6px;
+  max-width: 46em;
+  margin: 14px 0 0;
+  color: var(--soft);
+}
+.flow {
+  position: relative;
+  width: 100%;
+  margin-top: clamp(18px, 4vh, 44px);
+  text-align: left;
+}
+.stream {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+/* A stream of grey specks, one per question, and beside each task the
+   coloured dots it yielded. Overlapping dots mix like printing inks. */
+.specks {
+  fill: var(--ink);
+}
+.specks .s0 {
+  opacity: 0.16;
+}
+.specks .s1 {
+  opacity: 0.24;
+}
+.specks .s2 {
+  opacity: 0.34;
+}
+.ends {
+  font: 500 11.5px var(--round);
+  fill: var(--faint);
+  text-anchor: middle;
+}
+.tie {
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+.dot {
+  fill: var(--k);
+  mix-blend-mode: multiply;
+  cursor: pointer;
+}
+.dot.is-open {
+  fill: color-mix(in srgb, var(--k) 12%, transparent);
+  stroke: var(--k);
+  stroke-width: 2.6;
+}
+.dot.is-skipped {
+  opacity: 0.35;
+  cursor: default;
+}
+.dot:hover {
+  filter: brightness(1.12);
+}
+@media (prefers-color-scheme: dark) {
+  .dot {
+    mix-blend-mode: screen;
+  }
+}
+.mark {
+  fill: none;
+  stroke: var(--faint);
+  stroke-width: 1.5;
+}
+.overview-key > span {
+  white-space: nowrap;
+}
+.overview-key > span + span {
+  margin-left: 12px;
+}
+.key-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+.key-dot.is-kept {
+  background: var(--soft);
+}
+.key-dot.is-open {
+  box-shadow: inset 0 0 0 2px var(--soft);
+}
+.key-dot.is-ask {
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  background: var(--faint);
+  vertical-align: 1px;
+}
+.is-arriving .ht-row {
+  animation: ink-in 0.7s ease-out both;
+}
+.is-arriving .cluster {
+  animation: dot-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.is-arriving .flow-item {
+  animation: surface 0.5s ease-out both;
+}
+@keyframes ink-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+.flow-item {
+  position: absolute;
+  width: var(--w, 300px);
+}
+.flow-item.is-left {
+  text-align: right;
+}
+.flow-time {
+  margin: 0;
+  font: 500 12px/18px var(--round);
+  color: var(--faint);
+}
+.flow-title {
+  margin: 0 0 3px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.flow-line {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--soft);
+}
+.flow-item.is-left .flow-line {
+  justify-content: flex-end;
+}
+.flow-line.is-count {
+  color: var(--faint);
+}
+.who {
+  flex: none;
+  min-width: 22px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font: 600 11px/18px var(--round);
+  text-align: center;
+}
+.who.is-you {
+  background: var(--solid);
+  color: var(--on-solid);
+}
+.who.is-ai {
+  background: var(--fill-strong);
+  color: var(--soft);
+}
+.who.is-doubt {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--faint);
+  color: var(--soft);
+}
+.overview-foot {
+  margin-top: clamp(22px, 5vh, 52px);
+}
+.overview-foot .btn {
+  padding: 11px 18px 11px 22px;
+  font-size: 16px;
+}
+.tab b.is-bumped {
+  animation: bump 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes bump {
+  from {
+    transform: scale(1.8);
+  }
+}
+
+/* The dot a kept candidate turns into, on its way up to the count. */
+.fly {
+  position: fixed;
+  z-index: 5;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--k);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- motion */
+
+.is-entering .veil {
+  animation: lower 0.24s ease-out;
+}
+.is-entering .card {
+  animation: arrive 0.46s cubic-bezier(0.2, 0.9, 0.25, 1.1) backwards;
+}
+.is-entering .overview-title,
+.is-entering .overview-key,
+.is-entering .overview-foot {
+  animation: lower 0.5s ease-out backwards;
+  animation-delay: 0.25s;
+}
+@keyframes lower {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.975);
+  }
+}
+@keyframes surface {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.card.is-kept {
+  animation: kept 0.34s cubic-bezier(0.5, 0, 0.9, 0.5) forwards;
+}
+.card.is-skipped {
+  animation: skipped 0.24s ease-in forwards;
+}
+@keyframes kept {
+  to {
+    opacity: 0;
+    transform: translateY(46px) scale(0.9);
+  }
+}
+@keyframes skipped {
+  to {
+    opacity: 0;
+    transform: translateX(-70px) rotate(-2deg);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--fill-strong);
+}
+::selection {
+  background: color-mix(in srgb, var(--note) 30%, transparent);
+}
+
+@media (max-width: 1100px) {
+  .peek {
+    display: none;
+  }
+}
+@media (max-width: 720px) {
+  .bar {
+    grid-template-columns: 1fr auto;
+  }
+  .date {
+    display: none;
+  }
+  .dest {
+    margin-left: 0;
+    width: 100%;
+  }
+  .card {
+    border-radius: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A looping animation squeezed to 0.01ms lands on a random frame every
+     paint and flickers; run each once so it settles. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .settling i {
+    animation: none;
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "dotjar",
+  "version": "0.3.0",
+  "private": true,
+  "description": "告诉你今天和 agent 一起做的工作里，哪些东西值得长期留下。在浏览器里用，也可以铺成桌面上的一层毛玻璃。",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "bin": {
+    "dotjar": "bin/dotjar.js"
+  },
+  "scripts": {
+    "start": "node bin/dotjar.js web",
+    "stop": "node bin/dotjar.js stop",
+    "service": "node bin/dotjar.js service install",
+    "service:off": "node bin/dotjar.js service uninstall",
+    "demo": "node bin/dotjar.js demo",
+    "veil": "electron .",
+    "veil:demo": "electron . --demo",
+    "scan": "node bin/dotjar.js scan",
+    "distill": "node bin/dotjar.js distill",
+    "library": "node bin/dotjar.js library",
+    "test": "node --test",
+    "shot": "electron . --demo --shot",
+    "icon": "electron scripts/make-icon.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "41.0.2"
+  }
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>dotjar</title>
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"></div>
+    <div class="veil" aria-hidden="true"></div>
+
+    <header class="bar">
+      <div class="when">
+        <button class="date" id="date" type="button" aria-haspopup="dialog" aria-expanded="false" hidden></button>
+        <div class="cal" id="cal" role="dialog" hidden></div>
+      </div>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="tools">
+        <button class="tool" id="pick-engine" type="button" hidden></button>
+        <button class="tool" id="open-library" type="button"></button>
+        <button class="tool" id="put-away" type="button"></button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage" aria-live="polite"></main>
+
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <script src="markdown.js"></script>
+    <script src="words.js"></script>
+    <script src="demo-data.js"></script>
+    <script src="web-bridge.js"></script>
+    <script src="overlay.js"></script>
+  </body>
+</html>
