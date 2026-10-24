@@ -224,3 +224,7 @@ npm run shot
 - `src/server.js` the local web server, connecting the same interface to a session over HTTP
 
 There is one interface and two ways to host it. The desktop shell lays it over the screen as system-level frosted glass. The web server puts it in a browser. The server listens only on `127.0.0.1`, and every request must carry the authorization in `~/.dotjar/web-token` (traded for a browser cookie on first open), so neither another website nor another user on the same machine can call it.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

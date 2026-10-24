@@ -1,8 +1,9 @@
 {
   "name": "dotjar",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "告诉你今天和 agent 一起做的工作里，哪些东西值得长期留下。在浏览器里用，也可以铺成桌面上的一层毛玻璃。",
+  "license": "MIT",
   "main": "src/main.js",
   "type": "commonjs",
   "bin": {
