@@ -14,7 +14,9 @@ const ledger = require("./ledger");
 const markdown = require("../overlay/markdown");
 const words = require("../overlay/words");
 
-const KINDS = ["note", "rule", "skill", "memory"];
+// The four kinds a pass over a day turns up, then the four places an agent
+// writes to by itself.
+const KINDS = ["craft", "strategy", "lesson", "trap", "note", "rule", "skill", "memory"];
 const CHART_DAYS = 60;
 const PART_LIMIT = 9000; // characters of a file shown on its card
 
@@ -347,9 +349,10 @@ function renderPage(model, now = new Date()) {
       <p>${esc(T.libEmpty)}${gap}${esc(T.libHowTo(model.depositDir))}</p>
     </section>`;
 
-  const chips = KINDS.map(
-    (k) => `<button class="chip" type="button" data-kind="${k}" aria-pressed="false"><i class="dot"></i>${esc(T.kinds[k])}<b>${totals[k]}</b></button>`
-  ).join("");
+  // A filter for each kind there is something of.
+  const chips = KINDS.filter((k) => totals[k])
+    .map((k) => `<button class="chip" type="button" data-kind="${k}" aria-pressed="false"><i class="dot"></i>${esc(T.kinds[k])}<b>${totals[k]}</b></button>`)
+    .join("");
 
   return `<!doctype html>
 <html lang="${T.lang === "zh" ? "zh-CN" : "en"}">
@@ -385,13 +388,13 @@ function renderPage(model, now = new Date()) {
 // because this page has to stand alone as a single file.
 const LIBRARY_CSS = `
 :root{color-scheme:light dark;--bg:#f4f5f7;--card:#fff;--ink:rgb(0 0 0/.9);--soft:rgb(0 0 0/.56);--faint:rgb(0 0 0/.34);--line:rgb(0 0 0/.09);--fill:rgb(0 0 0/.05);
---note:#2f6bff;--rule:#f0349a;--skill:#00a878;--memory:#f29d00;--sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;--round:ui-rounded,"SF Pro Rounded",var(--sans)}
+--craft:#c98a00;--strategy:#009e86;--lesson:#2f6bff;--trap:#e0408a;--memory:#7a5cff;--star:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);--sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;--round:ui-rounded,"SF Pro Rounded",var(--sans)}
 @media (prefers-color-scheme:dark){:root{--bg:#0d0e11;--card:#17191e;--ink:rgb(255 255 255/.94);--soft:rgb(255 255 255/.6);--faint:rgb(255 255 255/.36);--line:rgb(255 255 255/.1);--fill:rgb(255 255 255/.07);
---note:#6b9bff;--rule:#ff6db5;--skill:#2fd6a3;--memory:#ffc53d}}
+--craft:#ffd166;--strategy:#5eead4;--lesson:#8ab4ff;--trap:#ff8fb8;--memory:#c4a7ff}}
 *{box-sizing:border-box}
 html{background:var(--bg)}
 body{margin:0 auto;max-width:860px;padding:72px 28px 96px;color:var(--ink);font:16px/1.7 var(--sans);-webkit-font-smoothing:antialiased}
-[data-kind=note]{--k:var(--note)}[data-kind=rule]{--k:var(--rule)}[data-kind=skill]{--k:var(--skill)}[data-kind=memory]{--k:var(--memory)}
+[data-kind=craft],[data-kind=rule]{--k:var(--craft)}[data-kind=strategy],[data-kind=skill]{--k:var(--strategy)}[data-kind=lesson],[data-kind=note]{--k:var(--lesson)}[data-kind=trap]{--k:var(--trap)}[data-kind=memory]{--k:var(--memory)}
 h1{margin:0;font-size:52px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .sum{margin:14px 0 0;color:var(--soft)}
 .chart{display:flex;align-items:flex-end;gap:3px;min-height:44px;margin:34px 0 0;padding-bottom:1px}
@@ -407,23 +410,23 @@ h1{margin:0;font-size:52px;font-weight:600;letter-spacing:-.02em;line-height:1.1
 .chip b{font:500 12.5px/1 var(--round);color:var(--faint)}
 .chip[aria-pressed=true]{background:var(--ink);border-color:transparent;color:var(--bg)}
 .chip[aria-pressed=true] b{color:inherit;opacity:.6}
-.dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--k)}
+.dot{flex:none;width:12px;height:12px;background:var(--k);clip-path:var(--star)}
 .day{margin-top:44px}
 .day h2{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;font-size:15px;font-weight:500;color:var(--soft)}
 .day h2 span{color:var(--faint)}
 .item{display:block;border-radius:18px;color:inherit;text-decoration:none}
 .note{margin:8px 0;background:var(--card);border:1px solid var(--line)}
-summary{display:grid;grid-template-columns:9px minmax(0,1fr);column-gap:14px;align-items:baseline;padding:16px 20px;cursor:pointer;list-style:none}
+summary{display:grid;grid-template-columns:12px minmax(0,1fr);column-gap:12px;align-items:baseline;padding:16px 20px;cursor:pointer;list-style:none}
 summary::-webkit-details-marker{display:none}
-summary .dot{align-self:start;margin-top:.62em}
+summary .dot{align-self:start;margin-top:.5em}
 .t{font-size:18.5px;font-weight:600;line-height:1.45;letter-spacing:-.005em}
 .p{grid-column:2;margin-top:2px;font-size:14px;color:var(--soft)}
-.by-agent .dot{background:transparent;box-shadow:inset 0 0 0 2px var(--k)}
+.by-agent .dot{clip-path:none;width:9px;height:9px;margin:.62em 1.5px 0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 2px var(--k)}
 .note summary:hover{background:var(--fill);border-radius:18px}
 .note details[open] summary:hover{border-radius:18px 18px 0 0}
 .md .more{color:var(--faint)}
 .rm{margin-left:auto;padding:0;border:0;background:none;color:var(--faint);font:inherit;font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-.rm:hover{color:var(--rule)}
+.rm:hover{color:var(--trap)}
 .item.is-leaving{animation:leave .32s ease-in forwards}
 @keyframes leave{to{opacity:0;transform:translateX(-24px)}}
 .snack{position:fixed;left:50%;bottom:28px;z-index:4;display:flex;align-items:center;gap:16px;padding:12px 18px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:14.5px;transform:translateX(-50%);box-shadow:0 12px 32px rgb(0 0 0/.18)}
@@ -447,8 +450,8 @@ kbd{padding:1px 7px;border-radius:6px;background:var(--fill);font:500 13px var(-
 footer{margin-top:72px;font-size:14px;color:var(--faint)}
 [hidden]{display:none!important}
 .item.is-target{animation:target 2.4s ease-out}
-@keyframes target{0%,30%{box-shadow:0 0 0 3px color-mix(in srgb,var(--note) 55%,transparent)}100%{box-shadow:0 0 0 3px transparent}}
-@media (prefers-reduced-motion:reduce){.item.is-target{animation:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--note) 55%,transparent)}}
+@keyframes target{0%,30%{box-shadow:0 0 0 3px color-mix(in srgb,var(--lesson) 55%,transparent)}100%{box-shadow:0 0 0 3px transparent}}
+@media (prefers-reduced-motion:reduce){.item.is-target{animation:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--lesson) 55%,transparent)}}
 @media (max-width:560px){body{padding:44px 18px 72px}h1{font-size:38px}.bar{margin:28px -18px 0;padding:12px 18px}.chart{height:96px;gap:2px}.col i{width:5px;height:5px}}
 `;
 

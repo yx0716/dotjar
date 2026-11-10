@@ -63,7 +63,9 @@ function start() {
   lang = flag("lang") ? config.resolveLanguage({ language: flag("lang") }) : config.resolveLanguage(cfg, app.getLocale());
   T = words.copy(lang, cfg.wording);
   // Undoing a keep puts the note in the system trash rather than deleting it.
-  session = createSession({ language: lang, onView: (view) => updatePresence(view), discard: (file) => shell.trashItem(file) });
+  // A rest that falls due lowers the veil over whatever is on screen.
+  session = createSession({ language: lang, onView: (view) => updatePresence(view), discard: (file) => shell.trashItem(file), onRestDue: () => showVeil(true) });
+  if (!HEADLESS && !DEMO) setInterval(() => session.rest.tick().catch(() => {}), 30 * 1000).unref();
 
   const theme = flag("theme");
   if (theme === "light" || theme === "dark") nativeTheme.themeSource = theme;
@@ -156,7 +158,9 @@ function createWindow() {
   if (flag("lang")) query.lang = flag("lang");
   win.loadFile(path.join(__dirname, "overlay", "overlay.html"), { query });
   win.on("blur", () => {
-    if (!holdOpen && !DEV && !HEADLESS) hideVeil();
+    // A rest stays up until it is over or skipped, like the break it is.
+    const resting = session && session.rest.status().phase === "resting";
+    if (!holdOpen && !resting && !DEV && !HEADLESS) hideVeil();
   });
   win.on("close", (e) => {
     if (!app.isQuitting) {
@@ -169,8 +173,13 @@ function createWindow() {
   if (DEV) win.webContents.openDevTools({ mode: "detach" });
 }
 
-function showVeil() {
-  if (!win || !loaded || HEADLESS || win.isVisible()) return;
+function showVeil(forRest) {
+  if (!win || !loaded || HEADLESS) return;
+  if (win.isVisible()) {
+    // Already up: the page only has to be told a rest has begun.
+    if (forRest === true) win.webContents.send("dotjar:shown");
+    return;
+  }
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   win.setBounds(display.bounds);
   win.show();
@@ -318,6 +327,13 @@ function registerIpc() {
   handle("dotjar:calendar", (month) => session.calendar(month));
   handle("dotjar:distilling", () => session.isDistilling());
   handle("dotjar:set-engine", (id) => session.setEngine(id));
+  handle("dotjar:rest", () => session.rest.status());
+  handle("dotjar:rest-recap", () => session.rest.recap());
+  handle("dotjar:rest-start", () => session.rest.start());
+  handle("dotjar:rest-skip", () => session.rest.skip());
+  handle("dotjar:rest-snooze", () => session.rest.snooze());
+  handle("dotjar:rest-done", () => session.rest.done());
+  handle("dotjar:set-rest", (patch) => session.rest.set(patch));
   handle("dotjar:keep", (id) => session.keep(id));
   handle("dotjar:skip", (id) => session.skip(id));
   handle("dotjar:reopen", (id) => session.reopen(id));

@@ -6,6 +6,9 @@
 
 (function () {
   if (window.dotjarBridge || !/^https?:$/.test(location.protocol)) return;
+  // `?demo` asks for the made-up day even when served: a look at what a full
+  // day is like before there is one of your own.
+  if (new URLSearchParams(location.search).has("demo")) return;
 
   // The page sets its language on <html>; these few messages follow it.
   const say = (zh, en) => (document.documentElement.lang === "en" ? en : zh);
@@ -22,7 +25,7 @@
     } catch {
       throw new Error(
         res.status === 403
-          ? say("这个页面的授权失效了，在终端重新跑一下 npm run web", "This page is no longer authorized. Run npm run web again in a terminal.")
+          ? say("这个页面的授权失效了，在终端再运行一次 dotjar", "This page is no longer authorized. Run dotjar again in a terminal.")
           : say(`本机的 dotjar 服务没回应（${res.status}）`, `The local dotjar server did not answer (${res.status}).`)
       );
     }
@@ -42,6 +45,13 @@
     distilling: () => call("distilling"),
     setEngine: (id) => call("setEngine", id),
     restart: () => call("restart"),
+    rest: (beat) => call("rest", beat),
+    restRecap: () => call("restRecap"),
+    restStart: () => call("restStart"),
+    restSkip: () => call("restSkip"),
+    restSnooze: () => call("restSnooze"),
+    restDone: () => call("restDone"),
+    setRest: (patch) => call("setRest", patch),
     keep: (id) => call("keep", id),
     skip: (id) => call("skip", id),
     reopen: (id) => call("reopen", id),

@@ -1,8 +1,10 @@
 {
   "name": "dotjar",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
-  "description": "告诉你今天和 agent 一起做的工作里，哪些东西值得长期留下。在浏览器里用，也可以铺成桌面上的一层毛玻璃。",
+  "description": "把今天和 AI agent 的对话看成一条银河：告诉你怎么把 agent 用得更好，捞起值得长期留下的策略、经验和盲点，隔一阵提醒你歇一歇、回看刚才做了什么。",
+  "repository": "github:yx0716/dotjar",
+  "keywords": ["agent", "claude-code", "codex", "cursor", "learning", "reflection", "notes"],
   "license": "MIT",
   "main": "src/main.js",
   "type": "commonjs",

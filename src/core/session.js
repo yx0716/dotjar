@@ -11,8 +11,9 @@ const config = require("./config");
 const ledger = require("./ledger");
 const library = require("./library");
 const dotjar = require("./dotjar");
-const { engines } = require("./distill");
+const { engines, resolveEngine } = require("./distill");
 const { dayWindow } = require("./sources");
+const { createRest } = require("./rest");
 
 function createSession(options = {}) {
   let cfg = config.load();
@@ -103,12 +104,26 @@ function createSession(options = {}) {
   // Counts of work per day for months that are over do not change; keep them.
   const pastMonths = new Map();
 
+  // The timed rest and the look back that comes with it. Whatever hosts the
+  // session calls `rest.tick()` now and then and is told when one falls due.
+  const rest = createRest({
+    getConfig: () => cfg,
+    saveConfig: (patch) => {
+      cfg = config.save(patch);
+    },
+    collect: (from, to) => dotjar.sessionsBetween(cfg, from, to),
+    onDue: (status) => (options.onRestDue || (() => {}))(status),
+    now: options.now,
+    idle: options.idle,
+  });
+
   return {
     get config() {
       return cfg;
     },
     today,
     distill,
+    rest,
     isDistilling: () => (progress ? { ...progress } : false),
     async calendar(month) {
       const now = new Date();
@@ -217,7 +232,8 @@ function createSession(options = {}) {
     language,
     // Which engine goes through the day, and which others could.
     engine() {
-      return { engine: cfg.engine, engineModel: cfg.engine === "openai" ? cfg.api.model || "" : "", engines: engines(cfg) };
+      const engine = resolveEngine(cfg);
+      return { engine, engineModel: engine === "openai" ? cfg.api.model || "" : "", engines: engines(cfg) };
     },
 
     setEngine(id) {

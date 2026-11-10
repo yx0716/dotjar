@@ -116,7 +116,12 @@ function readBody(req) {
   });
 }
 
+// A page that asked about the rest within this long is taken to be open.
+// Generous, because a tab in the background is only let run once a minute.
+const PAGE_SEEN_FOR = 100 * 1000;
+
 function createApi(session, options = {}) {
+  const page = options.page || { seenAt: 0, visible: false, notifies: false };
   return {
     meta: () => ({
       demo: false,
@@ -142,6 +147,20 @@ function createApi(session, options = {}) {
     reopen: (id) => session.reopen(id),
     capture: (text) => session.capture(text, "网页"),
     setDepositDir: (dir) => session.setDepositDir(dir),
+    // The page asks this every so often while it is open; the asking is also
+    // how the server knows a page is there to show a rest when one falls due.
+    rest: (beat) => {
+      page.seenAt = Date.now();
+      page.visible = Boolean(beat && beat.visible);
+      page.notifies = Boolean(beat && beat.notifies);
+      return session.rest.status();
+    },
+    restRecap: () => session.rest.recap(),
+    restStart: () => session.rest.start(),
+    restSkip: () => session.rest.skip(),
+    restSnooze: () => session.rest.snooze(),
+    restDone: () => session.rest.done(),
+    setRest: (patch) => session.rest.set(patch),
     removeFromLibrary: (file) => session.removeFromLibrary(file),
     restoreToLibrary: (undo) => session.restoreToLibrary(undo),
     restart: () => {
@@ -159,10 +178,21 @@ function createApi(session, options = {}) {
 }
 
 function createServer(options = {}) {
-  const session = options.session || createSession();
-  const token = options.token || loadToken();
+  // What is known of the page in the browser, for deciding who shows a rest.
+  const page = { seenAt: 0, visible: false, notifies: false };
   let httpServer = null;
-  const api = createApi(session, { restartable: options.restartable, restart: () => relaunch(httpServer) });
+  // A rest fell due. A page that is on screen shows it by itself, and one in
+  // the background that may send notifications calls the person over; with
+  // neither, the page is opened in the browser, in front.
+  const onRestDue = () => {
+    const open = Date.now() - page.seenAt < PAGE_SEEN_FOR;
+    if (open && (page.visible || page.notifies)) return;
+    const address = httpServer && httpServer.address();
+    if (address) openInBrowser(`http://127.0.0.1:${address.port}/?rest=1`);
+  };
+  const session = options.session || createSession(options.watchRest ? { onRestDue } : {});
+  const token = options.token || loadToken();
+  const api = createApi(session, { restartable: options.restartable, restart: () => relaunch(httpServer), page });
 
   httpServer = http.createServer(async (req, res) => {
     try {
@@ -182,7 +212,7 @@ function createServer(options = {}) {
         });
       }
       if (!sameToken(cookieOf(req, COOKIE), token)) {
-        return send(res, 403, "text/html; charset=utf-8", "<!doctype html><meta charset=utf-8><title>dotjar</title><p style=\"font:16px system-ui;margin:3em\">这个页面要从 dotjar 打开：在终端运行 <code>npm run web</code>。<br>Open this page from dotjar: run <code>npm run web</code> in a terminal.</p>");
+        return send(res, 403, "text/html; charset=utf-8", "<!doctype html><meta charset=utf-8><title>dotjar</title><p style=\"font:16px system-ui;margin:3em\">这个页面要从 dotjar 打开：在终端再运行一次 dotjar，它会用带授权的地址打开这一页。<br>Open this page from dotjar: run dotjar again in a terminal and it opens this page with its token.</p>");
       }
 
       if (req.method === "GET" || req.method === "HEAD") {
@@ -223,6 +253,12 @@ function createServer(options = {}) {
       else res.end();
     }
   });
+  // The server that stays running keeps the time between rests.
+  if (options.watchRest && session.rest) {
+    const timer = setInterval(() => session.rest.tick().catch(() => {}), 30 * 1000);
+    timer.unref();
+    httpServer.on("close", () => clearInterval(timer));
+  }
   return httpServer;
 }
 
@@ -283,7 +319,7 @@ async function start(options = {}) {
   // Port 0 asks the system for any free port (used by the tests).
   const wanted = options.port === 0 ? 0 : Number(options.port) || DEFAULT_PORT;
   for (let port = wanted; port < wanted + 10; port++) {
-    const server = createServer({ token, restartable: options.restartable });
+    const server = createServer({ token, restartable: options.restartable, watchRest: options.watchRest });
     try {
       const bound = await listen(server, port);
       return { server, port: bound, url: `http://127.0.0.1:${bound}/?t=${token}`, reused: false };

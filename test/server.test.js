@@ -148,3 +148,34 @@ test("a desktop companion can ask for a pulse without rescanning", async (t) => 
   assert.equal(body.ok, true);
   assert.equal(body.value.open, 1);
 });
+
+test("the page can ask about the rest, take one, and change how often", async (t) => {
+  const os = require("os");
+  process.env.DOTJAR_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-web-rest-"));
+  const { createSession } = require("../src/core/session");
+  // A real session, so the calls go all the way through; nobody is ever away.
+  const session = createSession({ language: "zh", idle: () => 0 });
+  const token = "d".repeat(48);
+  const srv = server.createServer({ session, token });
+  const port = await server.listen(srv, 0);
+  t.after(() => srv.close());
+  const post = async (name, ...args) =>
+    JSON.parse((await request(port, { method: "POST", path: `/api/${name}`, headers: { cookie: `${server.COOKIE}=${token}`, "content-type": "application/json", "x-dotjar": "1" } }, JSON.stringify({ args }))).body).value;
+
+  // Off until someone turns it on.
+  const off = await post("rest", { visible: true, notifies: false });
+  assert.deepEqual([off.enabled, off.phase, off.everyMin, off.forMin], [false, "idle", 50, 5]);
+  assert.deepEqual(off.choices, { every: [25, 50, 90], for: [3, 5, 10] });
+
+  const on = await post("setRest", { enabled: true, everyMin: 25 });
+  assert.deepEqual([on.enabled, on.everyMin, on.dueAt > on.now], [true, 25, true]);
+  assert.deepEqual(require("../src/core/config").load().rest, { enabled: true, everyMin: 25, forMin: 5 }, "kept across restarts");
+
+  // Taken by hand, looked back on, and ended.
+  assert.equal((await post("restStart")).phase, "resting");
+  const recap = await post("restRecap");
+  assert.ok(Array.isArray(recap.things) && recap.minutes >= 1);
+  const done = await post("restDone");
+  assert.deepEqual([done.phase, done.count], ["idle", 1]);
+  assert.equal(await post("restRecap"), null);
+});

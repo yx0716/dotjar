@@ -20,14 +20,14 @@ const item = (kind, title) => ({ id: itemId(kind, title), kind, title, payoff: "
 
 test("going through a day again only adds; nothing already listed is dropped or undone", () => {
   const home = freshHome();
-  const a = item("note", "甲");
-  const b = item("rule", "乙");
-  const c = item("skill", "丙");
+  const a = item("lesson", "甲");
+  const b = item("craft", "乙");
+  const c = item("strategy", "丙");
   ledger.saveDay(ledger.applyDistilled(ledger.loadDay("2026-06-10"), [a, b, c], { at: 1, model: "m" }));
   ledger.keep("2026-06-10", a.id, path.join(home, "deposits"));
   ledger.skip("2026-06-10", b.id);
 
-  const again = ledger.applyDistilled(ledger.loadDay("2026-06-10"), [a, b, item("note", "丁")], { at: 2, model: "m" });
+  const again = ledger.applyDistilled(ledger.loadDay("2026-06-10"), [a, b, item("trap", "丁")], { at: 2, model: "m" });
   const status = Object.fromEntries(again.items.map((i) => [i.title, i.status]));
   assert.deepEqual(status, { 甲: "kept", 乙: "skipped", 丙: "open", 丁: "open" });
   assert.deepEqual(again.items.map((i) => i.title), ["甲", "乙", "丙", "丁"], "what is new comes after what was there");
@@ -38,13 +38,13 @@ test("going through a day again only adds; nothing already listed is dropped or 
 test("keeping writes a note the knowledge base can take as is", () => {
   const home = freshHome();
   const dir = path.join(home, "deposits");
-  const a = item("note", 'a/b: 键由"调用方"生成?');
-  ledger.saveDay(ledger.applyDistilled(ledger.loadDay("2026-06-10"), [a, item("note", "另一条")]));
+  const a = item("lesson", 'a/b: 键由"调用方"生成?');
+  ledger.saveDay(ledger.applyDistilled(ledger.loadDay("2026-06-10"), [a, item("lesson", "另一条")]));
 
   const { item: kept } = ledger.keep("2026-06-10", a.id, dir);
   assert.equal(path.basename(kept.file), "a b 键由 调用方 生成.md");
   const text = fs.readFileSync(kept.file, "utf8");
-  assert.ok(text.startsWith("---\ncreated: 2026-06-10\nsource: dotjar\nkind: note\nprojects: [\"a/b\"]\ntags: [dotjar/心得]\n---\n"));
+  assert.ok(text.startsWith("---\ncreated: 2026-06-10\nsource: dotjar\nkind: lesson\nprojects: [\"a/b\"]\ntags: [dotjar/经验]\n---\n"));
   assert.ok(text.includes('# a/b: 键由"调用方"生成?'));
   assert.ok(text.includes("**什么时候用上**：用上的时候"));
 
@@ -58,7 +58,7 @@ test("keeping writes a note the knowledge base can take as is", () => {
   assert.equal(fs.readdirSync(dir).length, 1);
 
   // An existing note with the same name is never overwritten.
-  const other = item("rule", "同名");
+  const other = item("craft", "同名");
   fs.writeFileSync(path.join(dir, "同名.md"), "已有内容");
   ledger.saveDay(ledger.applyDistilled(ledger.loadDay("2026-06-11"), [other]));
   assert.equal(path.basename(ledger.keep("2026-06-11", other.id, dir).item.file), "同名 2.md");
@@ -194,4 +194,39 @@ test("several days can be gone through in one go, one after another", async () =
   } finally {
     Object.assign(dotjar, real);
   }
+});
+
+test("the jar counts what was kept, and a pass leaves a word on how the day went", () => {
+  const home = freshHome();
+  const dir = path.join(home, "deposits");
+  const day = (key, list, meta) => ledger.saveDay(ledger.applyDistilled(ledger.loadDay(key), list, meta));
+  const a = item("lesson", "很久以前的");
+  const b = item("craft", "上周的");
+  const c = item("trap", "今天的");
+  const d = item("strategy", "今天略过的");
+  day("2026-05-01", [a], { at: 1 });
+  day("2026-06-06", [b], { at: 2 });
+  day("2026-06-10", [c, d], { at: 3, growth: { highlight: "你追问了怎么验证的", next: "先说验收标准", applied: [{ title: "上周的", how: "今天用上了" }] } });
+  for (const [key, it] of [["2026-05-01", a], ["2026-06-06", b], ["2026-06-10", c]]) ledger.keep(key, it.id, dir);
+  ledger.skip("2026-06-10", d.id);
+
+  // Everything kept, how much of it in the last seven days, and on how many days.
+  assert.deepEqual(ledger.tally("2026-06-10"), { total: 3, week: 2, days: 3 });
+  assert.deepEqual(ledger.tally("2026-06-05"), { total: 1, week: 0, days: 1 }, "as it stood on an earlier day");
+  assert.equal(path.basename(ledger.fileOfKept("上周的")), "上周的.md");
+  assert.equal(ledger.fileOfKept("今天略过的"), "");
+
+  // Going through the day again without anything to say keeps what was said before.
+  const again = ledger.applyDistilled(ledger.loadDay("2026-06-10"), [], { at: 4, growth: { highlight: "", next: "", applied: [] } });
+  assert.equal(again.growth.highlight, "你追问了怎么验证的");
+  assert.equal(ledger.applyDistilled(again, [], { at: 5, growth: { highlight: "新的一句", next: "", applied: [] } }).growth.highlight, "新的一句");
+
+  // The page is told all of it, with where each thing put to use is kept.
+  const dotjar = require("../src/core/dotjar");
+  const cfg = require("../src/core/config").load();
+  const win = { key: "2026-06-10", start: new Date(2026, 5, 10, 4).getTime(), end: new Date(2026, 5, 11, 4).getTime() };
+  const v = dotjar.view(cfg, { window: win, sessions: [], day: ledger.loadDay("2026-06-10"), todayKey: "2026-06-10" });
+  assert.deepEqual(v.jar, { total: 3, week: 2, days: 3 });
+  assert.equal(v.growth.next, "先说验收标准");
+  assert.deepEqual(v.growth.applied.map((x) => [x.title, x.how, path.basename(x.file)]), [["上周的", "今天用上了", "上周的.md"]]);
 });

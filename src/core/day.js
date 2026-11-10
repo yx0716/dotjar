@@ -86,7 +86,7 @@ function hhmm(ts) {
 
 function renderTurn(turn) {
   const parts = [];
-  if (turn.user) parts.push(`他说：${clip(turn.user, USER_LIMIT)}`);
+  if (turn.user) parts.push(`他说${turn.ts ? `（${hhmm(turn.ts)}）` : ""}：${clip(turn.user, USER_LIMIT)}`);
   if (turn.reply) parts.push(`agent 收尾：${clip(turn.reply, REPLY_LIMIT)}`);
   if (turn.note) parts.push(`他存下的一段${turn.from ? `（来自 ${turn.from}）` : ""}：${clip(turn.note, NOTE_LIMIT)}`);
   return parts.join("\n");

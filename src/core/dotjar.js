@@ -14,8 +14,9 @@ const { distill } = require("./distill");
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
-function collect(cfg, win) {
+function collect(cfg, win, extra = {}) {
   return collectDay({
+    ...extra,
     window: win,
     claudeDir: config.expandHome(cfg.claudeDir),
     codexDir: config.expandHome(cfg.codexDir),
@@ -27,8 +28,13 @@ function collect(cfg, win) {
   });
 }
 
+// How far back to look for a day with work in it when today has none yet.
+// A week covers a Monday morning, a holiday, and a first try on a quiet day.
+const LOOK_BACK_DAYS = 7;
+
 // The day to look at. Usually today; but first thing in the morning, before
-// any work has been done, it is yesterday that is waiting to be gone through.
+// any work has been done, it is the last day there was work that is waiting
+// to be gone through: yesterday, or Friday on a Monday.
 // `options.day` asks for one particular day outright ("2026-10-12");
 // `options.daysBack` (0 or 1) is the same for today and yesterday.
 async function scan(cfg = config.load(), now = new Date(), options = {}) {
@@ -39,10 +45,14 @@ async function scan(cfg = config.load(), now = new Date(), options = {}) {
   let win = asked ? windowForKey(asked, cfg.dayStartHour) : today;
   let found = await collect(cfg, win);
   if (!asked && !found.sessions.length) {
-    const earlier = await collect(cfg, yesterday);
-    if (earlier.sessions.length) {
-      win = yesterday;
-      found = earlier;
+    for (let back = 1; back <= LOOK_BACK_DAYS; back++) {
+      const before = windowForKey(ledger.keyDaysBefore(today.key, back), cfg.dayStartHour);
+      const earlier = await collect(cfg, before);
+      if (earlier.sessions.length) {
+        win = before;
+        found = earlier;
+        break;
+      }
     }
   }
   const daysBack = Math.round((windowForKey(today.key, 12).start - windowForKey(win.key, 12).start) / (24 * 3600 * 1000));
@@ -54,6 +64,13 @@ async function scan(cfg = config.load(), now = new Date(), options = {}) {
   const before = daysBack ? null : ledger.loadDay(yesterday.key);
   const earlier = before && (before.items.length || before.tasks.length) ? { day: yesterday.key, open: before.items.filter((i) => i.status === "open").length } : null;
   return { window: win, sessions, settled, day, daysBack, earlier, todayKey: today.key };
+}
+
+// The conversations that were alive between two moments: something asked in
+// them, or an agent still at work on something asked before.
+async function sessionsBetween(cfg, from, to) {
+  const key = dayWindow(new Date(from), cfg.dayStartHour).key;
+  return (await collect(cfg, { key, start: from, end: to }, { carried: true })).sessions;
 }
 
 function inboxDir() {
@@ -114,10 +131,23 @@ function view(cfg, scanned) {
     // Everything this day's pass turned up, each beside the task it came from.
     dots: day.tasks.length ? dotsOf(day.items, day.tasks) : [],
     activity: activity(sessions),
+    // What the pass said about how the person is getting on, and what the
+    // jar holds by now.
+    growth: growthOf(day.growth),
+    jar: ledger.tally(todayKey),
     history: ledger.history(30, win.key),
     depositDir: config.tildify(config.depositDir(cfg)),
     hotkey: cfg.hotkey,
   };
+}
+
+// One thing done well, one thing to try, and which earlier keepers were put
+// to use, each of those with the note it lives in so it can be opened.
+function growthOf(growth) {
+  if (!growth) return null;
+  const applied = (Array.isArray(growth.applied) ? growth.applied : []).map((a) => ({ title: a.title, how: a.how || "", file: ledger.fileOfKept(a.title) }));
+  if (!growth.highlight && !growth.next && !applied.length) return null;
+  return { highlight: growth.highlight || "", next: growth.next || "", applied };
 }
 
 function clock(ts) {
@@ -214,7 +244,8 @@ async function distillToday(cfg = config.load(), options = {}) {
     throw err;
   }
   const digest = buildDigest(sessions);
-  const recent = ledger.recentTitles(14, win.key);
+  // A month of keepers: enough for the pass to notice one being put to use.
+  const recent = ledger.recentTitles(30, win.key);
   // Still waiting, from earlier days or from an earlier pass over this one:
   // not to be offered a second time.
   const before = ledger.loadDay(win.key);
@@ -228,7 +259,8 @@ async function distillToday(cfg = config.load(), options = {}) {
     dayKey: win.key,
     digest: digest.text,
     settled,
-    kept: [...recent.kept, ...pending.map((i) => i.title)],
+    kept: recent.kept,
+    pending: pending.map((i) => i.title),
     skipped: recent.skipped,
     language: options.language,
     signal: options.signal,
@@ -242,6 +274,7 @@ async function distillToday(cfg = config.load(), options = {}) {
       costUsd: res.costUsd,
       stats: digest.stats,
       tasks: res.tasks,
+      growth: res.growth,
     })
   );
   const added = day.items.filter((i) => i.foundAt === startedAt).length;
@@ -289,4 +322,4 @@ async function calendar(cfg, month, now = new Date(), activity = null) {
   return { month, todayKey, days, activity: asks };
 }
 
-module.exports = { scan, view, today, distillToday, capture, inboxDir, dateLabel, monthActivity, calendar };
+module.exports = { scan, view, today, distillToday, capture, inboxDir, dateLabel, monthActivity, calendar, sessionsBetween };

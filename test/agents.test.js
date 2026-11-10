@@ -128,7 +128,7 @@ test("without a home for other agents, only Claude Code and Codex are read", asy
   assert.deepEqual(day.sessions, []);
 });
 
-test("before any work today, the day to look at is yesterday", async () => {
+test("before any work today, the day to look at is the last one that had some", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-yday-"));
   process.env.DOTJAR_HOME = path.join(home, "data");
   const dotjar = require("../src/core/dotjar");
@@ -143,9 +143,15 @@ test("before any work today, the day to look at is yesterday", async () => {
   const nextMorning = await dotjar.scan(cfg, new Date(2026, 5, 11, 9));
   assert.deepEqual([nextMorning.window.key, nextMorning.daysBack, nextMorning.sessions.length], ["2026-06-10", 1, 1]);
   assert.equal(dotjar.view(cfg, nextMorning).daysBack, 1);
-  // Two days on there is nothing to fall back to.
+  // After a day off it is still there: a Monday morning looks at Friday.
   const later = await dotjar.scan(cfg, new Date(2026, 5, 12, 9));
-  assert.deepEqual([later.window.key, later.daysBack, later.sessions.length], ["2026-06-12", 0, 0]);
+  assert.deepEqual([later.window.key, later.daysBack, later.sessions.length], ["2026-06-10", 2, 1]);
+  // More than a week on there is nothing recent enough to fall back to.
+  const muchLater = await dotjar.scan(cfg, new Date(2026, 5, 19, 9));
+  assert.deepEqual([muchLater.window.key, muchLater.daysBack, muchLater.sessions.length], ["2026-06-19", 0, 0]);
+  // Asked for by name, an empty today is shown as it is.
+  const named = await dotjar.scan(cfg, new Date(2026, 5, 12, 9), { day: "2026-06-12" });
+  assert.deepEqual([named.window.key, named.daysBack, named.sessions.length], ["2026-06-12", 0, 0]);
 });
 
 test("yesterday stays reachable once today has work of its own", async () => {

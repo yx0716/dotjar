@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 
-// Headless entry point: the same scan and distillation the veil runs, printed
-// to the terminal. Handy for checking what the app would see and send.
+// The way in. With no command it starts the page and opens it in the
+// browser, which is all most people ever need: `npx github:yx0716/dotjar`.
+// The other commands run the same scan and pass the page runs, printed to
+// the terminal: handy for checking what it would see and send.
 
 const config = require("../src/core/config");
 const ledger = require("../src/core/ledger");
@@ -10,28 +12,51 @@ const dotjar = require("../src/core/dotjar");
 const { buildDigest } = require("../src/core/day");
 const { buildPrompt } = require("../src/core/distill");
 
-const USAGE = `用法：dotjar <命令>
+const USAGE = `用法：dotjar [命令]
 
-  scan      扫描今天：有多少段工作，agent 已经写下了什么
-  digest    打印会交给模型的材料
-  prompt    打印完整的整理提示词
-  distill   调用本地 claude 整理今天，结果写入台账
-  show      打印今天台账里的候选
-  library   重新生成汇总页（所有留下的笔记合成一个 HTML），打印它的路径
-  web       在浏览器里用（npm start 就是它）：服务在后台跑起来，页面在浏览器里打开
-            --port <n> 指定端口（默认 4747）  --no-open 不打开浏览器  --foreground 留在这个终端里跑
-  stop      停掉后台的服务
-  service   install：登录时自动启动，之后只用开收藏夹   uninstall：取消   status：看看现在怎样
-  demo      用演示数据在浏览器里看看样子，不读本机任何东西
+  （不带命令）  启动，并在浏览器里打开。服务在后台跑，终端可以关掉
+                --port <n> 指定端口（默认 4747）  --no-open 不打开浏览器  --foreground 留在这个终端里跑
+  demo          用演示数据看看样子，不读本机任何东西
+  stop          停掉后台的服务
+  service       install：登录时自动启动，之后只用开收藏夹   uninstall：取消   status：看看现在怎样
+
+  scan          扫描今天：有多少段工作，agent 已经写下了什么
+  digest        打印会交给模型的材料
+  prompt        打印完整的打捞提示词
+  distill       打捞今天，结果写入台账
+  show          打印今天台账里的候选
+  library       重新生成星罐（所有留下的笔记合成一个 HTML），打印它的路径
 `;
+
+// How this was started, so that what is printed can be typed back as it is:
+// through npx, through the scripts of a clone, or as an installed command.
+const viaNpx = process.env.npm_lifecycle_event === "npx" || process.env.npm_command === "exec";
+
+function again(sub) {
+  const env = process.env;
+  if (viaNpx) return `npx github:yx0716/dotjar${sub ? ` ${sub}` : ""}`;
+  if (env.npm_lifecycle_event) return { "": "npm start", stop: "npm run stop", "service install": "npm run service", "service uninstall": "npm run service:off" }[sub] || `npm run ${sub}`;
+  return `${/\.js$/.test(process.argv[1] || "") ? "node bin/dotjar.js" : "dotjar"}${sub ? ` ${sub}` : ""}`;
+}
 
 function line(s = "") {
   process.stdout.write(s + "\n");
 }
 
 async function main() {
-  const cmd = process.argv[2];
+  // No command, or only flags: start the page.
+  const first = process.argv[2];
+  const cmd = !first || first.startsWith("--port") || first === "--no-open" || first === "--foreground" ? "web" : first;
   const cfg = config.load();
+
+  if (cmd === "help" || cmd === "--help" || cmd === "-h") {
+    process.stdout.write(USAGE);
+    return;
+  }
+  if (cmd === "--version" || cmd === "-v") {
+    line(require("../package.json").version);
+    return;
+  }
 
   if (cmd === "scan") {
     const scanned = await dotjar.scan(cfg);
@@ -55,16 +80,17 @@ async function main() {
       process.stderr.write(`\n${JSON.stringify(digest.stats)}\n`);
       return;
     }
-    const recent = ledger.recentTitles(14, scanned.window.key);
-    line(buildPrompt({ dayKey: scanned.window.key, digest: digest.text, settled: scanned.settled, kept: recent.kept, skipped: recent.skipped }));
+    const recent = ledger.recentTitles(30, scanned.window.key);
+    const pending = [...ledger.backlog(scanned.window.key), ...scanned.day.items.filter((i) => i.status === "open")].map((i) => i.title);
+    line(buildPrompt({ dayKey: scanned.window.key, digest: digest.text, settled: scanned.settled, kept: recent.kept, pending, skipped: recent.skipped }));
     return;
   }
 
   if (cmd === "distill") {
-    process.stderr.write("正在整理…\n");
+    process.stderr.write("正在打捞…\n");
     const res = await dotjar.distillToday(cfg);
     const cost = res.costUsd == null ? "" : `，花费 $${res.costUsd.toFixed(4)}`;
-    process.stderr.write(`整理完成：${res.found} 条，用时 ${Math.round((res.durationMs || 0) / 1000)} 秒${cost}\n\n`);
+    process.stderr.write(`捞完了：${res.found} 颗，用时 ${Math.round((res.durationMs || 0) / 1000)} 秒${cost}\n\n`);
     printCandidates(res.view);
     return;
   }
@@ -72,13 +98,13 @@ async function main() {
   if (cmd === "web") {
     const server = require("../src/server");
     const service = require("../src/service");
-    const args = process.argv.slice(3);
+    const args = process.argv.slice(first === "web" ? 3 : 2);
     const portAt = args.indexOf("--port");
     const port = portAt === -1 ? undefined : Number(args[portAt + 1]);
     const open = !args.includes("--no-open");
 
     if (args.includes("--foreground")) {
-      const res = await server.start({ port, restartable: true });
+      const res = await server.start({ port, restartable: true, watchRest: true });
       if (res.reused) {
         line(`dotjar 已经在 ${res.port} 端口运行。`);
         return;
@@ -105,14 +131,19 @@ async function main() {
     line(`dotjar 在后台运行，页面${open ? "已经在浏览器里打开" : "地址见下"}：http://127.0.0.1:${res.port}/`);
     line(`第一次用这个带授权的地址打开，之后收藏上面那个就行：${res.url}`);
     if (service.installed()) line("它已经设成登录时自动启动，以后不用再跑命令。");
-    else line("这个终端可以关了。停掉用 npm run stop；想登录时自动启动、以后不用再跑命令，跑一次 npm run service。");
+    else {
+      line(`这个终端可以关了。停掉：${again("stop")}`);
+      // Run through npx it lives in npx's cache, which is no place for
+      // something the system is to start at every login.
+      line(viaNpx ? "想登录时自动启动、以后只开收藏夹：先 npm install -g github:yx0716/dotjar，再 dotjar service install" : `想登录时自动启动、以后只开收藏夹：${again("service install")}`);
+    }
     return;
   }
 
   if (cmd === "stop") {
     const service = require("../src/service");
     if (service.installed()) {
-      line("dotjar 现在是登录时自动启动的，停了也会被系统拉起来。要彻底停掉：npm run service:off");
+      line(`dotjar 现在是登录时自动启动的，停了也会被系统拉起来。要彻底停掉：${again("service uninstall")}`);
       return;
     }
     line((await service.stop()) ? "已停掉。" : "后台没有在跑的 dotjar。");
@@ -128,7 +159,7 @@ async function main() {
       server.openInBrowser(res.url);
       line(`装好了。以后登录就自动启动，收藏这个地址即可：http://127.0.0.1:${res.port}/`);
       line(`第一次用这个带授权的地址打开：${res.url}`);
-      line("取消：npm run service:off");
+      line(`取消：${again("service uninstall")}`);
     } else if (sub === "uninstall") {
       line(service.uninstall() ? "已取消登录时自动启动，服务也停了。" : "本来就没有设成自动启动。");
     } else {
@@ -157,8 +188,9 @@ async function main() {
     return;
   }
 
+  process.stderr.write(`没有 ${cmd} 这个命令。\n\n`);
   process.stdout.write(USAGE);
-  process.exitCode = cmd ? 1 : 0;
+  process.exitCode = 1;
 }
 
 function printCandidates(v) {

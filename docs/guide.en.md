@@ -2,79 +2,110 @@
 
 [中文](guide.md) | English · [Back to the README](../README.en.md)
 
-After a day of working with AI agents, dotjar picks out **the ways of thinking worth keeping for the long run** and drops them, one at a time, into a jar. It runs in your browser, or as a sheet of frosted glass over your desktop; if you like desktop pets, the crab in [clawd-insights](https://github.com/yx0716/clawd-insights) picks up the dots with you.
+After a day of working with AI agents, dotjar lays the day out as a river of stars: it shows where you could have worked with the agent more smoothly, and brings up **the strategies, lessons and blind spots worth keeping for the long run**, one star at a time, into a jar. It runs in your browser, or as a sheet of frosted glass over your desktop; if you like desktop pets, the crab in [clawd-insights](https://github.com/yx0716/clawd-insights) fishes with you.
 
-It doesn't replay what each conversation did. It first lays the day out as a trickle of dots running down the page (what you worked on, when, what each thing turned up that is worth keeping, and which part was your own call), then hands you, one at a time, the things that would still help on another project three months from now, and asks whether to keep them.
+It doesn't replay what each conversation did. It first draws the day as a river running from morning to night (what you worked on, which stars each thing yielded, and which part was your own call), then hands you, one card at a time, the things that would still help on another project three months from now, and asks whether to keep them.
 
 ![Today](en/veil.png)
 
-![A candidate](en/card.png)
+![A card](en/card.png)
 
-It follows the system's light or dark appearance:
+It follows the system's appearance: midnight when the system is dark, dusk when it is light.
 
-![Dark](en/veil-dark.png)
+![Dusk](en/veil-dusk.png)
 
 ## Three views, one job each
 
-- **Today**: what you see first. The day is a trickle of dots running down the page, morning at the top. Each question you asked is a small grey speck at the time you asked it: thick and wide where you were asking a lot, a few strays in the quiet hours. Each thing you worked on sits at the time you started on it, with the dots it turned up beside it. Each dot is one thing worth keeping, coloured by kind: solid once kept, a ring while it waits for you, a faint speck if you passed it over. Hover a dot for its title; click it to open it (the card if it is waiting, the Library page if it is kept). Beside each thing are its hours, the call you made, the call an agent made for you that you may not have noticed, and a Check line: a conclusion the agent gave without really verifying it, worth checking yourself. Before the day has been gone through there are no dots yet; each conversation is one thing under its own name (Claude Code and Codex both keep one), with its project and how many times you asked. Conversations without a name are grouped by project.
-- **Worth keeping**: the candidates, one card at a time. What it keeps is not facts but ways of thinking: the aim is a map and judgment, knowing where to look when something happens and how to tell whether an answer is right (the idea comes from the takeaway skill). Facts you looked up, command flags and API details, things it is enough to know exist, are left out. Each card is one complete thought with a draft you can save as a note as is. Three kinds:
-  - Lesson: a way of looking at a problem. The draft says when it should come to mind, where to look, why, where it came up today, how to tell if it's right, and when it doesn't apply
-  - Rule: a trade-off to keep making, including where you corrected an agent and choices an agent made for you that are worth settling; it says what the alternatives were and why they lost
-  - Routine: a way to check, telling whether a conclusion was really verified
+- **Today**: what you see first. The day is a river of stars running down the page, morning at the top. Each question you asked is one small star in it, at the time you asked: the river is wide and bright where you were asking a lot, a thin thread in the quiet hours. Dust drifts down it all the while; the stars that stand for questions stay put (with “reduce motion” on in the system, the whole river holds still). Each thing you worked on sits at the time you started on it, with the stars it yielded beside it. Each star is one thing worth keeping, coloured by kind: solid and glowing once kept, an outline while it waits for you, a faint small one if you passed it over. The stars of one thing are joined into a small constellation. Hover a star for its kind and title; click it to open it (the card if it is waiting, its page in the Jar if it is kept). Beside each thing are its hours, the call you made, the call an agent made for you that you may not have noticed, and a Check line: a conclusion the agent gave without really verifying it, worth checking yourself.
+
+  Under the title are up to three lines of feedback on the day itself. **Done well** is one specific thing you did, a fact and not a compliment, left out when there is none. **Put to use** is an earlier keeper that came in handy today; click it to open that note. **Next time** is one small thing to try, aimed at wherever today cost you the most rounds. The jar at the top right says how many stars it holds by now.
+
+  Before the day has been gone through the river holds only your questions; each conversation is one thing under its own name (Claude Code and Codex both keep one), with its project and how many times you asked. Conversations without a name are grouped by project.
+- **Caught**: the candidates, one card at a time. Each is one complete thought with a draft you can save as a note as is, and each points at a moment of today; advice that would fit any day (“be specific”) is left out, and so are facts you looked up, command flags and API details. Four kinds:
+  - **Craft**: how to work with the agent. The draft quotes what you said and the back-and-forth it caused, gives wording you can copy and use next time, and says what the agent was missing; if it is something you would have to say every time, it also gives a line or two for `CLAUDE.md` / `AGENTS.md`. Things you did well are caught too, as something to keep doing. Two a day at most.
+  - **Strategy**: a way of going at a kind of problem. When to use it, the steps (and what to look at in each), how today's run went, when it fails. Ways of checking belong here.
+  - **Lesson**: a judgement the work earned. What happened, what is going on underneath (drawn as an arrow chain or a small table where it can be), what to check first next time, where it stops holding.
+  - **Blind spot**: a case that is easy to leave out. What was missed, why it is easy to miss, the one question to ask before starting next time. Ones you actually ran into are caught; one that nobody raised but the material says should have been considered may be caught too, marked as not verified yet.
 
   `Esc` goes back to Today.
-- **Kept**: what has been kept today. Besides what you kept, it lists what agents wrote into your notes, rule files, memory and skills. That part is read straight from the records, with no model involved. Clicking an entry opens it in the Library, scrolled to and unfolded.
+- **Kept**: what has been kept today. Besides what you kept (stars), it lists what agents wrote into your notes, rule files, memory and skills (small rings). That part is read straight from the records, with no model involved. Clicking an entry opens it in the Jar, scrolled to and unfolded.
 
 Click the date at the top left for a calendar. Days with records are shaded and say how many things were found, how many are still open, or that they haven't been gone through. Click a date to look at that day; tick the circle at a day's top right to go through several days in one go, oldest first, one model call per day.
 
 A day can be gone through more than once. If you worked more after a morning pass, Today says how many new asks came since and offers to go through again (`R`). A second pass only adds what is new: candidates already listed stay as they are, and nothing kept or skipped comes back.
 
-A candidate you haven't decided on doesn't vanish when the day ends. Anything left open from the past 90 days stays at the front of Worth keeping, marked with the day it came from. To look at yesterday's stream again, press `Y`. Open it in the morning before any work and yesterday is what you see.
+A candidate you haven't decided on doesn't vanish when the day ends. Anything left open from the past 90 days stays at the front of Caught, marked with the day it came from. To look at yesterday's river again, press `Y`. Open it before any work today and what you see is the last day that had some (Friday, on a Monday morning), looking back a week at most.
+
+## Breaks
+
+The moon at the top right opens timed breaks: every 25 / 50 / 90 minutes, for 3 / 5 / 10 minutes. Off by default.
+
+![A break](en/rest.png)
+
+- The time counts from when you start asking an agent. A stretch with no questions to an agent is not a stretch of work and brings no reminder. Time away from the keyboard that is as long as a break counts as one, and the count starts over when you are back (macOS). If you happen to be away when one falls due, it waits for you.
+- When it is time the whole page gives way to a quiet night sky and a countdown. A page that is on screen just changes; one in the background sends a notification if you allowed them, and otherwise the page is brought to the front. With the frosted-glass veil, the veil lowers itself.
+- In the last minute of the break, a look back at the stretch before it comes up, in three columns: **Waiting on you** (the agent ended on a question, or stopped mid-turn a long while ago), **Agent still running**, **Wrapped up**. Each card is one conversation: what you set going in this stretch, the latest thing you said, how the agent left it, and a thin line marking when each of your questions fell. The look back stays after the countdown ends; press `↵` to go back to work.
+- You can skip (`Esc`; it does not count toward today's breaks, and the timing starts over) or ask for five more minutes. “Take one now” starts a break by hand at any time, with or without the timer.
+- The look back is read straight from the conversation records on this machine. No model is called, it costs nothing, and nothing is sent anywhere.
 
 ## Running it
 
 All it needs is Node (20 or newer). Nothing to install:
 
 ```bash
-npm start
+npx github:yx0716/dotjar
 ```
 
-The server starts in the background, the page opens in your browser, and you can close the terminal. Open it the first time with the authorized address printed in the terminal; after that, bookmark `http://127.0.0.1:4747/`. Stop it with `npm run stop`. When dotjar's code is updated, the bottom of the page says the server behind it is still the old one; click “Restart it” to switch. Running `npm start` again switches too.
-
-To never run that command again (macOS):
+The server starts in the background, the page opens in your browser, and you can close the terminal. Open it the first time with the authorized address printed in the terminal; after that, bookmark `http://127.0.0.1:4747/`. To stop it:
 
 ```bash
-npm run service
+npx github:yx0716/dotjar stop
 ```
 
-Do this once and it starts at login from then on, so all you do is open the bookmark. Undo it with `npm run service:off`.
+To have a plain `dotjar` command from then on, install it globally:
+
+```bash
+npm install -g github:yx0716/dotjar
+```
+
+To never run a command again (macOS), install it globally as above, then:
+
+```bash
+dotjar service install
+```
+
+Do this once and it starts at login from then on, so all you do is open the bookmark. Undo it with `dotjar service uninstall`. (It can be set up through `npx` too, but then it points into npx's cache and stops working when the cache is cleared.)
+
+Running from source is the same: clone the repository and `npm start`, with `npm run stop`, `npm run service` and `npm run service:off` to match. When dotjar's code is updated, the bottom of the page says the server behind it is still the old one; click “Restart it” to switch. Starting it again switches too.
 
 Why it isn't a plain page you can double-click: it has to read the agents' records on your machine and write notes into a folder. A page in a browser can do neither on its own, so a small server listening only on this machine (`127.0.0.1`) sits behind it.
 
 To see what it looks like without reading anything from your machine:
 
 ```bash
-npm run demo
+npx github:yx0716/dotjar demo
 ```
+
+On a day with no conversations yet, the page offers the same made-up day.
 
 | Key | What it does |
 |---|---|
-| `1` `2` `3` | Switch to Today, Worth keeping, Kept |
-| `←` `→` | Browse the candidates. A sideways swipe on the trackpad, the arrows beside the card and the dots at its top right do the same; look through them all first, decide later |
-| `↵` | Keep: write the draft to a Markdown note |
+| `1` `2` `3` | Switch to Today, Caught, Kept |
+| `←` `→` | Browse the candidates. A sideways swipe on the trackpad, the arrows beside the card and the small stars at its top right do the same; look through them all first, decide later |
+| `↵` | Keep: write the draft to a Markdown note; the star flies into the jar |
 | `⌫` | Skip: it won't be offered again |
 | `Z` | Undo the last step |
 | `C` | Copy the draft |
 | `R` | Go through the day again |
-| `L` | Open the Library |
-| `Esc` | From the cards or the list, back to Today |
+| `L` | Open the Jar |
+| `Esc` | From the cards or the list, back to Today; during a break, skip it |
 | `Y` | Switch between today and yesterday. For earlier days, click the date at the top left and pick from the calendar |
 | `E` | Switch who goes through the day: your local Claude, your local Codex, or your endpoint |
 | `⌘V` | Add the clipboard's text to today's material |
 
 ### Or lay it over the desktop as frosted glass (optional)
 
-The same interface can also sit over your desktop as a veil that drops on a shortcut and lifts when it loses focus. That needs Electron:
+The same interface can also sit over your desktop as a veil that drops on a shortcut and lifts when it loses focus. That needs a clone of the repository and Electron:
 
 ```bash
 npm install
@@ -84,22 +115,22 @@ npm install
 npm run veil
 ```
 
-The veil adds two global shortcuts: `⌥⇧S` lowers and lifts it, and `⌥⇧C` adds the clipboard to today's material from any app. After it closes, the app keeps running; press `⌥⇧S`, click the Dock icon, click “Keep” in the menu bar, or run `npm run veil` again to bring it back, and quit with `⌘Q`. Run this way, the Dock shows the name Electron with dotjar's icon. The browser version and the veil can run at once and share the same data.
+The veil adds two global shortcuts: `⌥⇧S` lowers and lifts it, and `⌥⇧C` adds the clipboard to today's material from any app. After it closes, the app keeps running; press `⌥⇧S`, click the Dock icon, click its icon in the menu bar, or run `npm run veil` again to bring it back, and quit with `⌘Q`. Run this way, the Dock shows the name Electron with dotjar's icon. The browser version and the veil can run at once and share the same data.
 
 ## Where kept things go
 
 Every keep adds one plain Markdown file to the notes folder, `~/.dotjar/deposits/` by default. No Obsidian needed, and no note app at all. Click “Change” at the bottom right of a card to use any folder, such as your own notes directory or an Obsidian inbox.
 
-### The Library: all your notes as one page
+### The Jar: all your notes as one page
 
-![Library](en/library.png)
+![The Jar](en/library.png)
 
-Press `L`, or click Library at the top right, to open `~/.dotjar/library.html` in your browser. It is a single self-contained page that loads nothing from the network, generated from the Markdown in the notes folder: ordered by day, searchable, filterable by kind, each note opening in place. What agents wrote into notes, rule files, memory and skills opens the same way, marked with a hollow dot: a file created that day opens in full, and a file added to shows only the sections added that day. An index page that only gained a link is left out. In the browser version each card can be removed once opened: a note you kept moves to `~/.dotjar/trash` and its candidate counts as skipped; something an agent wrote is only hidden, its file untouched; both can be undone straight away. It is regenerated on every keep, undo and open. The Markdown stays the only source of truth, so edit the notes directly.
+Press `L`, or click the jar at the top right, to open `~/.dotjar/library.html` in your browser. It is a single self-contained page that loads nothing from the network, generated from the Markdown in the notes folder: ordered by day, searchable, filterable by kind, each note opening in place. What you kept is marked with a star. What agents wrote into notes, rule files, memory and skills opens the same way, marked with a small ring: a file created that day opens in full, and a file added to shows only the sections added that day. An index page that only gained a link is left out. In the browser version each card can be removed once opened: a note you kept moves to `~/.dotjar/trash` and its candidate counts as skipped; something an agent wrote is only hidden, its file untouched; both can be undone straight away. It is regenerated on every keep, undo and open. The Markdown stays the only source of truth, so edit the notes directly.
 
 To build it without the interface:
 
 ```bash
-npm run library
+dotjar library
 ```
 
 ## Where today's material comes from
@@ -120,9 +151,9 @@ npm run library
 
 ## Which model goes through the day
 
-Three choices. Click at the top right (or press `E`) to switch between the ones available on your machine:
+Three choices, and nothing to set up: `claude` is used if it is installed, `codex` if not, and an endpoint if you have configured one and neither is there. When more than one is available, click at the top right (or press `E`) to switch; your choice is remembered:
 
-- **Your local Claude** (default): runs the `claude` command with no tools and no saved session.
+- **Your local Claude**: runs the `claude` command with no tools and no saved session.
 - **Your local Codex**: runs `codex exec`, read-only, no web search, no saved session.
 - **Any OpenAI-compatible endpoint**: a company gateway, DeepSeek, a local Ollama. Use this where neither command can be installed. Edit `~/.dotjar/config.json`:
 
@@ -137,7 +168,7 @@ Three choices. Click at the top right (or press `E`) to switch between the ones 
 }
 ```
 
-The key can live in the environment variable named by `apiKeyEnv`, or directly in `api.apiKey`. The material is sent only to the one you pick.
+The key can live in the environment variable named by `apiKeyEnv`, or directly in `api.apiKey`. The material is sent only to the one you pick. Going through a day is one model call.
 
 ## Other settings
 
@@ -145,12 +176,13 @@ All in `~/.dotjar/config.json`; restart to apply.
 
 | Key | Meaning | Default |
 |---|---|---|
-| `language` | Interface language: `zh`, `en`, or `auto` to follow the system. Kept notes and the Library use the same one | `auto` |
-| `wording` | Chinese only: what keeping is called across the interface (`落库`, `落袋`, `波点`, `归仓`, `攒`, `带走`, `存档`) | `落库` |
+| `language` | Interface language: `zh`, `en`, or `auto` to follow the system. Kept notes and the Jar use the same one | `auto` |
+| `wording` | Chinese only: what keeping is called across the interface (`打捞`, `落库`, `落袋`, `归仓`, `攒`, `带走`, `存档`) | `打捞` |
+| `rest` | Timed breaks: `{ "enabled": false, "everyMin": 50, "forMin": 5 }`. Also set from the interface; here it takes lengths the interface does not offer | off |
 | `hotkey` | Lower or lift the veil | `Alt+Shift+S` |
 | `captureHotkey` | Add the clipboard to today's material | `Alt+Shift+C` |
 | `dayStartHour` | The hour a day starts; work after midnight counts toward the day before | `4` |
-| `engine` | Who goes through the day: `claude-cli`, `codex-cli`, `openai`. Also switchable in the interface | `claude-cli` |
+| `engine` | Who goes through the day: `auto` (whichever is installed), `claude-cli`, `codex-cli`, `openai`. Also switchable in the interface | `auto` |
 | `model` | Passed to `claude --model` | `sonnet` |
 | `codexModel` / `codexEffort` | Model passed to Codex (empty uses its own default) and how hard it thinks | empty / `low` |
 | `depositDir` | The notes folder | `~/.dotjar/deposits` |
@@ -160,18 +192,18 @@ All interface text is in `src/overlay/words.js`.
 
 ## Command line
 
-Everything also works without the interface, which is handy for checking what it saw and what it would send:
+Everything also works without the interface, which is handy for checking what it saw and what it would send (from a clone, use `node bin/dotjar.js` in place of `dotjar`):
 
 ```bash
-npm run scan
+dotjar scan
 ```
 
 ```bash
-node bin/dotjar.js prompt
+dotjar prompt
 ```
 
 ```bash
-npm run distill
+dotjar distill
 ```
 
 Command-line output is in Chinese for now.
@@ -180,17 +212,24 @@ Command-line output is in Chinese for now.
 
 All under `~/.dotjar/` (change it with the `DOTJAR_HOME` environment variable):
 
-- `days/2026-10-13.json`: one ledger per day, with the candidates, your decisions, and what agents wrote that day
+- `days/2026-10-13.json`: one ledger per day, with the candidates, your decisions, the day's feedback, and what agents wrote that day
 - `deposits/`: the Markdown you kept
-- `library.html`: the Library
+- `library.html`: the Jar
 - `trash/`: where a note goes when you undo a keep in the browser version (the veil uses the system Trash)
+- `rest.json`: how many breaks today, and when the last one ended
 - `web-token`: authorization for the browser version
 - `inbox/`: material you added yourself
 - `config.json`
 
 ## Known limits
 
-- Which thing a dot sits beside is marked by the model when it goes through the day. For days gone through before this was added, it is inferred from shared wording and can be wrong; dots it cannot place gather at the end of the stream. The hours are the model's estimate too, read from the times in the conversations; before the day is gone through, they are each conversation's first and last ask.
+- Which thing a star sits beside is marked by the model when it goes through the day. Where it did not say, it is inferred from shared wording and can be wrong; stars it cannot place gather at the end of the river. The hours are the model's estimate too, read from the times in the conversations; before the day is gone through, they are each conversation's first and last ask.
+- Craft advice goes only by what you said and the agents' closing messages. It cannot see which tools an agent called in between, so it does not judge whether the agent did that part well.
+- “Done well” and “Put to use” are written by the model. “Put to use” only accepts the title of something you really kept; anything else is dropped. “Done well” has no such check; if it reads wrong, disregard it.
+- Candidates of the three earlier kinds (Lesson / Rule / Routine) and notes already kept show as before, in the colour of the nearest new kind; passes from now on produce the four kinds only. The desktop pet needs an update to know the new kinds' colours; until then it shows them all in blue.
+- “Agent still running” during a break goes by whether the transcript says the turn has ended, which Claude Code and Codex record. Other agents do not, so for them it goes by whether there is a closing message, and a line said along the way can be taken for the end.
+- In a browser a break cannot cover the whole screen the way a native app does. When the page is in the background and may not send notifications, all it can do is bring the page to the front (in a new tab, which tries to close itself afterwards). For a break that covers the screen, use the frosted-glass veil. The veil's breaks follow the browser version's code and have not yet been run in Electron.
+- Time away from the keyboard can only be read on macOS. Elsewhere breaks go by the clock and by whether an agent was asked anything.
 - Claude Code, Codex and OpenClaw were checked against real records. Cursor was checked against older records for format. Gemini CLI, Qwen Code, opencode and CodeBuddy had no data on the development machine and are covered only by tests written to their file formats.
 - Cursor records carry no time per message, so a conversation that began before today contributes only its last few turns.
 - What agents wrote is recognized from their file-writing records. A note changed through a shell command (`cat >>`, say) is not seen. Going through the day takes the agent's own “archived” remarks into account to avoid duplicates, but that note won't appear under Kept.
@@ -209,17 +248,18 @@ npm test
 npm run shot
 ```
 
-`npm run shot` renders a screenshot of the demo day to `shots/veil.png` without ever showing a window. Add `-- --lang=en`, `-- --theme=dark` or `-- --view=open` for other states. The code:
+`npm run shot` renders a screenshot of the demo day to `shots/veil.png` without ever showing a window. Add `-- --lang=en`, `-- --theme=dark`, `-- --view=open` or `-- --demo-state=rest` for other states. The demo also opens without Electron: open `src/overlay/overlay.html` in a browser, with `?state=rest`, `?state=fresh`, `?view=open` or `?lang=en` after the address. The code:
 
 - `src/core/sources.js` reads the day's records (Claude Code, Codex, text you added)
 - `src/core/agents.js` reads the other local agents
 - `src/core/durable.js` decides whether a file is something kept for the long run, and what kind
 - `src/core/day.js` gathers what agents wrote and condenses the material for the model
-- `src/core/distill.js` the prompt and the two engines
+- `src/core/distill.js` the prompt and the three engines
+- `src/core/rest.js` the timing of breaks, and the look back over a stretch of time
 - `src/core/ledger.js` the daily ledger and saving notes
-- `src/core/library.js` the Library page
+- `src/core/library.js` the Jar page
 - `src/core/session.js` everything the interface can ask for, whoever is hosting it
-- `src/overlay/` the interface (plain HTML, CSS and JS; open `overlay.html` in a browser to see the demo)
+- `src/overlay/` the interface (plain HTML, CSS and JS)
 - `src/main.js` the desktop shell: the veil window, Dock, menu bar and shortcuts, connecting the interface to a session over IPC
 - `src/server.js` the local web server, connecting the same interface to a session over HTTP
 
