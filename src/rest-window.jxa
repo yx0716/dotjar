@@ -1,0 +1,110 @@
+// The rest, over everything on screen (macOS).
+//
+// A page in a browser cannot put itself in front of other programs, and a
+// rest nobody sees is not one. So when a rest begins, the server runs this
+// with the system's own `osascript`: it opens a window with no frame on
+// every screen, above every other window and on every desktop, full screen
+// apps included, and shows dotjar's rest page in the one in front. Nothing
+// has to be installed for it.
+//
+//   DOTJAR_REST_URL=<url> osascript -l JavaScript rest-window.jxa "" [seconds] [corner]
+//
+// It goes away when the page says the rest is over, when the page has not
+// come up within a few seconds, when the server ends it, or after `seconds`
+// at the latest: it must never be left sitting over someone's screen. `corner` shows it as a small
+// window in a corner instead, for trying it out.
+
+ObjC.import("Cocoa");
+ObjC.import("WebKit");
+
+function run(argv) {
+  // The address carries the page's token. It comes in the environment: an
+  // Keep it out of ordinary command-line listings; this is not a security
+  // boundary against other processes running as the same user.
+  const url = String(argv[0] || ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey("DOTJAR_REST_URL")) || "");
+  const seconds = Math.max(5, Number(argv[1]) || 2700);
+  const corner = argv[2] === "corner";
+  if (!/^http:\/\/127\.0\.0\.1:\d+\//.test(url)) throw new Error("rest-window shows only dotjar's own page on this machine");
+
+  const app = $.NSApplication.sharedApplication;
+  app.setActivationPolicy(1); // an accessory: no Dock icon, no menu bar of its own
+
+  // A window with no frame refuses the keyboard unless it is told otherwise,
+  // and the rest is skipped with Esc.
+  ObjC.registerSubclass({
+    name: "DotjarRestWindow",
+    superclass: "NSWindow",
+    methods: {
+      canBecomeKeyWindow: { types: ["bool", []], implementation: () => true },
+      canBecomeMainWindow: { types: ["bool", []], implementation: () => true },
+    },
+  });
+  // The page speaks to this window twice: "ready" once the rest is on
+  // screen, and anything else when it is over. A page that has not said it
+  // is ready after a few seconds did not load, and the window goes rather
+  // than sit there blank.
+  let ready = false;
+  ObjC.registerSubclass({
+    name: "DotjarRestEars",
+    superclass: "NSObject",
+    // (Not declared as conforming to WebKit's protocols: the bridge cannot
+    // find them by name, and WebKit only asks whether the methods are there.)
+    methods: {
+      "userContentController:didReceiveScriptMessage:": {
+        types: ["void", ["id", "id"]],
+        implementation: (controller, message) => {
+          if (ObjC.unwrap(message.body) === "ready") {
+            if (!ready) $.NSFileHandle.fileHandleWithStandardOutput.writeData($("ready\n").dataUsingEncoding($.NSUTF8StringEncoding));
+            ready = true;
+          }
+          else $.NSApp.terminate(null);
+        },
+      },
+      "check:": { types: ["void", ["id"]], implementation: () => ready || $.NSApp.terminate(null) },
+    },
+  });
+  const ears = $.DotjarRestEars.alloc.init;
+
+  const night = $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.024, 0.027, 0.086, 1);
+  const front = $.NSScreen.mainScreen; // the screen being worked on
+  const screens = $.NSScreen.screens;
+  const windows = [];
+  let page = null; // the window the page is in
+  for (let i = 0; i < screens.count; i++) {
+    const screen = screens.objectAtIndex(i);
+    const isFront = screen.isEqual(front);
+    if (corner && !isFront) continue;
+    const frame = corner ? $.NSMakeRect(screen.frame.origin.x + 40, screen.frame.origin.y + 60, 560, 360) : screen.frame;
+    const win = $.DotjarRestWindow.alloc.initWithContentRectStyleMaskBackingDefer(frame, 0 /* no frame */, 2 /* buffered */, false);
+    win.setReleasedWhenClosed(false);
+    win.setOpaque(true);
+    win.setBackgroundColor(night);
+    // Above every other window (the level screen savers use), on every
+    // desktop, and over full screen apps.
+    win.setLevel(corner ? 3 : 1000);
+    win.setCollectionBehavior(1 /* all desktops */ | 16 /* stays put */ | 256 /* beside full screen */);
+    if (isFront) {
+      const config = $.WKWebViewConfiguration.alloc.init;
+      config.setWebsiteDataStore($.WKWebsiteDataStore.nonPersistentDataStore); // nothing of the visit is kept
+      config.userContentController.addScriptMessageHandlerName(ears, "dotjarRest");
+      const view = $.WKWebView.alloc.initWithFrameConfiguration(win.contentView.bounds, config);
+      view.setAutoresizingMask(2 | 16); // as wide and as tall as the window
+      view.setValueForKey(false, "drawsBackground"); // the night shows until the page has painted
+      win.contentView.addSubview(view);
+      view.loadRequest($.NSURLRequest.requestWithURL($.NSURL.URLWithString(url)));
+      win.makeFirstResponder(view);
+      page = win;
+    }
+    windows.push(win);
+  }
+  for (const win of windows) win.orderFrontRegardless;
+  if (!corner && page) {
+    // Take the keyboard, so that Esc and Return reach the page.
+    app.activateIgnoringOtherApps(true);
+    page.makeKeyAndOrderFront(null);
+  }
+
+  $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(8, ears, "check:", null, false);
+  $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(seconds, app, "terminate:", null, false);
+  app.run;
+}

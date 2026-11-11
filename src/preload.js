@@ -15,6 +15,10 @@ async function call(channel, ...args) {
 contextBridge.exposeInMainWorld("dotjarBridge", {
   demo: process.argv.includes("--dotjar-demo"),
   meta: () => call("dotjar:meta"),
+  updateStatus: () => call("dotjar:update-status"),
+  updateCheck: () => call("dotjar:update-check"),
+  updateInstall: (version) => call("dotjar:update-install", version),
+  updatePreferences: (patch) => call("dotjar:update-preferences", patch),
   today: (daysBack) => call("dotjar:today", daysBack),
   distill: (days) => call("dotjar:distill", days),
   calendar: (month) => call("dotjar:calendar", month),

@@ -14,11 +14,15 @@
   const say = (zh, en) => (document.documentElement.lang === "en" ? en : zh);
 
   async function call(name, ...args) {
+    const controller = new AbortController();
+    const timeout = name === "restRecap" ? 20000 : name === "rest" ? 5000 : 0;
+    const timer = timeout ? setTimeout(() => controller.abort(), timeout) : null;
     const res = await fetch(`/api/${name}`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-dotjar": "1" },
       body: JSON.stringify({ args }),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
     let data;
     try {
       data = await res.json();
@@ -39,6 +43,10 @@
     demo: false,
     web: true,
     meta: () => call("meta"),
+    updateStatus: () => call("updateStatus"),
+    updateCheck: () => call("updateCheck"),
+    updateInstall: (version) => call("updateInstall", version),
+    updatePreferences: (patch) => call("updatePreferences", patch),
     today: (daysBack) => call("today", daysBack),
     distill: (days) => call("distill", days),
     calendar: (month) => call("calendar", month),

@@ -2,6 +2,8 @@
 
 中文 | [English](README.en.md)
 
+> 维天有汉，鉴亦有光。——《诗经·小雅·大东》
+
 和 AI agent 一起干完一天的活，dotjar 把这一天铺成一条银河：告诉你 agent 哪里可以用得更顺，把值得长期留下的策略、经验和盲点一颗一颗捞起来，装进罐子里。
 
 ![dotjar](docs/veil.png)
@@ -22,7 +24,7 @@ npx github:yx0716/dotjar demo
 
 - **用法**：从你今天的对话里指出哪句话让 agent 猜了范围、来回了几轮，再给一段下次可以直接拿去用的说法。
 - **认知**：换个项目还用得上的判断，分三种：一类问题的打法（策略）、处理问题得到的判断（经验）、思考时容易漏掉的情况（盲点）。一次一张卡片，收下或略过；收下的是普通 Markdown。
-- **成长**：今天做得好的一件具体的事，之前留下的哪一条今天用上了，罐子里已经攒了多少颗。
+- **成长**：今天做得好的一件具体的事，以及模型发现与过去经验相符的行为。每条反馈都能勾选「看过了」，散成星光后收起；随时可以展开恢复。勾选只表示已读，不代表认可模型的判断。
 
 ![一张卡片](docs/card.png)
 
@@ -34,7 +36,30 @@ npx github:yx0716/dotjar demo
 
 ## 读什么，交给谁
 
-读本机 Claude Code、Codex、Cursor、Gemini CLI、Qwen Code、opencode、OpenClaw 等的对话记录，只看你说的话和 agent 每轮的收尾，不上传。打捞交给你本机的 `claude` 或 `codex` 命令，装了哪个用哪个，也可以接任何 OpenAI 兼容的接口。歇一歇的回顾直接读记录，不经过模型。
+在本机读取 Claude Code、Codex、Cursor、Gemini CLI、Qwen Code、opencode、OpenClaw 等的对话记录，提取你说的话和 agent 每轮的收尾。捕捞时，这些摘要会交给你选择的模型服务：通过本机的 `claude`、`codex` 命令，或配置的 OpenAI 兼容接口。歇一歇的回顾只在本地读记录，不经过模型。
+
+## 版本更新
+
+**当前分支已实现更新器，首个签名更新包尚未发布。** 在正式发布前，请继续使用源码方式；下面的托管安装需要 GitHub Release 已包含签名附件。
+
+macOS + Node 20 或更新版本可使用托管安装。取得带更新器的版本后，先停止旧服务，再运行：
+
+```bash
+# 登录自启的旧版先运行 dotjar service uninstall；普通后台服务用 dotjar stop
+node bin/dotjar.js install-managed
+```
+
+把 `~/.local/bin` 加入 PATH，以后使用这里的 `dotjar`。需要登录自启时重新运行 `dotjar service install`。原配置、对话台账和笔记保留；源码工作区不会被覆盖。旧版本没有这个命令，需要先手动取得带更新器的版本。
+
+之后在页面右上角「更新」中检查新版、查看更新说明，并点击「更新并重启」。每日检查可选、默认关闭，不会自动安装。升级会验证签名，等待当前工作和休息结束；新版本启动失败会恢复上一版。也可以使用：
+
+```bash
+dotjar update check
+dotjar update install
+dotjar update status
+```
+
+完整的安装、迁移、发布和恢复说明见 [安装与更新](docs/updates.md)。可选定时捕捞与逐次消耗展示仍在设计阶段，不包含在本次实现中。
 
 ## 配个桌宠
 

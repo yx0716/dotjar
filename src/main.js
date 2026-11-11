@@ -322,6 +322,11 @@ function registerIpc() {
     });
 
   handle("dotjar:meta", () => ({ demo: DEMO, ...session.engine(), hotkey: cfg.hotkey, captureHotkey: cfg.captureHotkey, mac: isMac, wording: cfg.wording, language: lang }));
+  const updates = require("./update/manager");
+  handle("dotjar:update-status", () => updates.status());
+  handle("dotjar:update-check", () => updates.check());
+  handle("dotjar:update-install", (version) => updates.start(version));
+  handle("dotjar:update-preferences", (patch) => updates.preferences(patch));
   handle("dotjar:today", (back) => session.today(back));
   handle("dotjar:distill", (days) => session.distill(days));
   handle("dotjar:calendar", (month) => session.calendar(month));

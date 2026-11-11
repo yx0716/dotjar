@@ -16,7 +16,7 @@ const config = require("./core/config");
 const server = require("./server");
 
 const LABEL = "com.dotjar.web";
-const BIN = path.join(__dirname, "..", "bin", "dotjar.js");
+const BIN = process.env.DOTJAR_LAUNCHER || path.join(__dirname, "..", "bin", "dotjar.js");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -33,7 +33,7 @@ function writePid(port) {
   fs.writeFileSync(pidFile(), JSON.stringify({ pid: process.pid, port }));
   // Where this dotjar lives, so a desktop companion can start it again later.
   try {
-    fs.writeFileSync(path.join(config.dataDir(), "install.json"), JSON.stringify({ bin: BIN }));
+    fs.writeFileSync(path.join(config.dataDir(), "install.json"), JSON.stringify({ bin: BIN, port }));
   } catch {
     // only a convenience
   }
@@ -131,6 +131,7 @@ function plistXml(options = {}) {
   const home = process.env.DOTJAR_HOME || process.env.STRATA_HOME;
   if (home) env.DOTJAR_HOME = home;
   const args = [node, options.bin || BIN, "web", "--foreground", "--no-open"];
+  if (options.port) args.push("--port", String(options.port));
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -167,10 +168,11 @@ function launchctl(...args) {
 // Hand the server to launchd: started at login, restarted if it stops.
 async function install() {
   if (process.platform !== "darwin") throw new Error("开机自启目前只做了 macOS。其他系统请把 `node bin/dotjar.js web --foreground --no-open` 加进自己的启动项。");
+  const savedPort = readPid()?.port;
   await stop(); // a copy started by hand would hold the port
   fs.mkdirSync(path.dirname(plistPath()), { recursive: true });
   fs.mkdirSync(config.dataDir(), { recursive: true });
-  fs.writeFileSync(plistPath(), plistXml());
+  fs.writeFileSync(plistPath(), plistXml({ port: savedPort }));
   const domain = `gui/${process.getuid()}`;
   launchctl("bootout", `${domain}/${LABEL}`); // replace an earlier install; fine if there was none
   const res = launchctl("bootstrap", domain, plistPath());

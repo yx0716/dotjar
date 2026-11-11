@@ -39,6 +39,23 @@ function createSession(options = {}) {
     }
   }
 
+  // A day that is over reads the same every time, and reading it means going
+  // through every transcript touched since. So what was read for it is kept
+  // while this session runs: going back to a day already looked at is then
+  // immediate. A day still in progress is always read afresh.
+  const SETTLED_AFTER = 2 * 3600 * 1000;
+  const settledDays = new Map();
+  function dayCache(win, read) {
+    if (win.end > Date.now() - SETTLED_AFTER) return read();
+    if (!settledDays.has(win.key)) {
+      if (settledDays.size >= 14) settledDays.delete(settledDays.keys().next().value);
+      const reading = read();
+      reading.catch(() => settledDays.delete(win.key)); // a failed read is tried again next time
+      settledDays.set(win.key, reading);
+    }
+    return settledDays.get(win.key);
+  }
+
   // The day to show: a key like "2026-10-12" once one has been picked,
   // otherwise whichever the scan settles on (today, or yesterday first thing
   // in the morning). A pick sticks until another is made; "auto" clears it.
@@ -47,7 +64,7 @@ function createSession(options = {}) {
   async function today(pick) {
     if (pick === "auto") picked = undefined;
     else if (typeof pick === "string" && /^\d{4}-\d{2}-\d{2}$/.test(pick)) picked = pick;
-    lastScan = await dotjar.scan(cfg, new Date(), { day: picked });
+    lastScan = await dotjar.scan(cfg, new Date(), { day: picked, cache: dayCache });
     rebuildLibrary();
     return present(dotjar.view(cfg, lastScan));
   }
@@ -117,7 +134,7 @@ function createSession(options = {}) {
     idle: options.idle,
   });
 
-  return {
+  const api = {
     get config() {
       return cfg;
     },
@@ -244,6 +261,9 @@ function createSession(options = {}) {
       return this.engine();
     },
   };
+  const operations = require("./operations");
+  operations.wrap(rest, ["tick", "start", "skip", "snooze", "done", "set"]);
+  return operations.wrap(api, ["today", "distill", "keep", "skip", "reopen", "capture", "setDepositDir", "library", "removeFromLibrary", "restoreToLibrary", "setEngine"]);
 }
 
 // Outside the desktop shell there is no system trash to hand a file to, so

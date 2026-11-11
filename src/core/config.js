@@ -163,3 +163,5 @@ module.exports = {
   tildify,
   writeJsonAtomic,
 };
+
+require("./operations").wrap(module.exports, ["save"]);

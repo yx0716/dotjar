@@ -43,11 +43,13 @@ async function scan(cfg = config.load(), now = new Date(), options = {}) {
   let asked = options.day || (options.daysBack === 1 ? yesterday.key : options.daysBack === 0 ? today.key : null);
   if (asked && !(/^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= today.key)) asked = null; // not a day that has happened
   let win = asked ? windowForKey(asked, cfg.dayStartHour) : today;
-  let found = await collect(cfg, win);
+  // `options.cache(win, read)` lets whoever is asking keep what a finished day read.
+  const gather = (w) => (options.cache ? options.cache(w, () => collect(cfg, w)) : collect(cfg, w));
+  let found = await gather(win);
   if (!asked && !found.sessions.length) {
     for (let back = 1; back <= LOOK_BACK_DAYS; back++) {
       const before = windowForKey(ledger.keyDaysBefore(today.key, back), cfg.dayStartHour);
-      const earlier = await collect(cfg, before);
+      const earlier = await gather(before);
       if (earlier.sessions.length) {
         win = before;
         found = earlier;
@@ -323,3 +325,5 @@ async function calendar(cfg, month, now = new Date(), activity = null) {
 }
 
 module.exports = { scan, view, today, distillToday, capture, inboxDir, dateLabel, monthActivity, calendar, sessionsBetween };
+
+require("./operations").wrap(module.exports, ["scan", "today", "distillToday", "capture"]);

@@ -392,3 +392,5 @@ module.exports = {
   hiddenPaths,
   setHidden,
 };
+
+require("./operations").wrap(module.exports, ["saveDay", "keep", "skip", "reopen", "markRemoved", "markRestored", "setHidden"]);

@@ -74,6 +74,39 @@ test("the page gathers kept notes and what agents wrote, newest day first", () =
   assert.ok(!/https?:\/\//.test(html), "one self-contained file: nothing is loaded from the network");
 });
 
+test("the library carries local fonts and builds without network assets", (t) => {
+  const previousHome = process.env.DOTJAR_HOME;
+  const home = freshHome();
+  t.after(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+    if (previousHome === undefined) delete process.env.DOTJAR_HOME;
+    else process.env.DOTJAR_HOME = previousHome;
+  });
+  const cfg = config.load();
+  const file = library.build(cfg, new Date(2026, 5, 10), "en");
+  const html = fs.readFileSync(file, "utf8");
+  assert.match(html, /@font-face\s*\{\s*font-family:\s*"dotjar Kai";/);
+  assert.doesNotMatch(html, /https?:\/\//);
+  const fontDir = path.join(home, "fonts");
+  const names = ["huiwen-mincho-titles.woff", "lxgw-wenkai-medium.woff", "lxgw-wenkai-regular.woff"];
+  assert.deepEqual(fs.readdirSync(fontDir).sort(), names);
+  for (const name of names) {
+    assert.ok(html.includes(`url("fonts/${name}")`));
+    assert.deepEqual(fs.readFileSync(path.join(fontDir, name)), fs.readFileSync(path.join(__dirname, "../src/overlay/fonts", name)));
+    fs.utimesSync(path.join(fontDir, name), 1, 1);
+  }
+  library.build(cfg);
+  for (const name of names) assert.equal(fs.statSync(path.join(fontDir, name)).mtimeMs, 1000, "unchanged fonts are not copied again");
+  // A new subset can have the same byte length as the previous one.
+  fs.writeFileSync(path.join(fontDir, names[0]), Buffer.alloc(fs.statSync(path.join(fontDir, names[0])).size));
+  library.build(cfg);
+  assert.deepEqual(fs.readFileSync(path.join(fontDir, names[0])), fs.readFileSync(path.join(__dirname, "../src/overlay/fonts", names[0])));
+  fs.rmSync(fontDir, { recursive: true });
+  fs.writeFileSync(fontDir, "blocks font copying");
+  assert.equal(library.build(cfg), file, "font copy failures do not prevent page generation");
+  assert.ok(fs.readFileSync(file, "utf8").startsWith("<!doctype html>"));
+});
+
 test("with nothing settled the page says how to start", () => {
   freshHome();
   const html = library.renderPage(library.collect(config.load(), "zh"), new Date(2026, 5, 10, 8, 0));

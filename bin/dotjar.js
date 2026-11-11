@@ -16,6 +16,8 @@ const USAGE = `用法：dotjar [命令]
 
   （不带命令）  启动，并在浏览器里打开。服务在后台跑，终端可以关掉
                 --port <n> 指定端口（默认 4747）  --no-open 不打开浏览器  --foreground 留在这个终端里跑
+  update        check：检查新版   status：查看状态   install：更新托管版并重启
+  install-managed  首次安装或迁移到可一键更新的托管版（macOS）
   demo          用演示数据看看样子，不读本机任何东西
   stop          停掉后台的服务
   service       install：登录时自动启动，之后只用开收藏夹   uninstall：取消   status：看看现在怎样
@@ -55,6 +57,26 @@ async function main() {
   }
   if (cmd === "--version" || cmd === "-v") {
     line(require("../package.json").version);
+    return;
+  }
+
+  if (cmd === "install-managed") {
+    const result = await require("../src/update/install").install();
+    line(`已安装 ${result.version}：${result.entry}，请确保 ~/.local/bin 在 PATH 中。`);
+    line(result.output);
+    return;
+  }
+  if (cmd === "update") {
+    const updates = require("../src/update/manager");
+    const action = process.argv[3] || "status";
+    if (!["check", "status", "install"].includes(action)) throw new Error("用法：dotjar update check|status|install");
+    let result = action === "status" ? updates.status() : await updates.check();
+    if (action === "install") {
+      if (result.error) throw new Error(result.error);
+      if (!result.available) { line("当前没有可用的新版本"); return; }
+      result = await updates.start(result.latest);
+    }
+    line(JSON.stringify(result, null, 2));
     return;
   }
 

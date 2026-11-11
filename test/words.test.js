@@ -49,7 +49,7 @@ test("language is read from a setting or a locale, and sentences come out whole"
   assert.equal(zh.statusDone("17:42", 3, 9, zh.agents([{ name: "Codex", sessions: 6 }]), 2), "17:42 打捞过：3 个项目，9 段对话（Codex 6），之后又问了 2 次。");
   assert.equal(en.statusDone("17:42", 1, 9, en.agents([{ name: "Codex", sessions: 6 }]), 1), "Went through at 17:42: 1 project, 9 conversations (Codex 6), 1 ask since.");
   assert.equal(en.overviewTitle(1), "1 thing today");
-  assert.equal(zh.overviewTitle(5, 7), "今天做了 5 件事，捞到 7 颗星");
+  assert.equal(zh.overviewTitle(5, 8), "今日银河里，为你打捞起 8 颗星");
   assert.equal(en.overviewTitle(5, 1), "5 things today, 1 star caught");
   assert.equal(zh.seeOpen(4), "看 4 条待落库");
   assert.equal(words.copy("zh").seeOpen(4), "看看捞到的 4 颗");

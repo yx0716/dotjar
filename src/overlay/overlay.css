@@ -1,9 +1,38 @@
-/* A night sky. The day runs down it as a river of stars, one faint star for
+/* A night sky. The day runs across it as a river of stars, one faint star for
    every question asked; a pass over the day brings a few bright ones up, and
    the ones worth having go into the jar. Each view does one thing: the day at
    a glance, then one candidate at a time on a slab of dark glass, then the
-   list of what is kept. The sky follows the system: midnight when it is set
-   to dark, dusk when it is set to light. */
+   list of what is kept. The sky follows the system. Set to dark it is
+   midnight. Set to light it is a slate-blue dusk with large soft fields of
+   colour in it: aqua, denim blue, rose and a little cream. */
+
+.native-rest > :not(#rest) { visibility: hidden; }
+
+/* Two faces travel with the page besides the system's own.
+   汇文明朝体, an old Ming face, sets the interface's own titles and the line
+   of verse. It carries only the characters those titles use (see
+   scripts/fonts.js for why); anything else falls through to the next face.
+   霞鹜文楷 sets what comes out of the day's work: card titles, the names of
+   things, the drafts. It carries the characters of GB2312; a rarer one is
+   drawn by the system. If the whole of it is installed, that is used. */
+@font-face {
+  font-family: "dotjar Ming";
+  src: url("fonts/huiwen-mincho-titles.woff") format("woff");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "dotjar Kai";
+  src: local("LXGW WenKai"), local("LXGWWenKai-Regular"), url("fonts/lxgw-wenkai-regular.woff") format("woff");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "dotjar Kai";
+  src: local("LXGW WenKai Medium"), local("LXGWWenKai-Medium"), url("fonts/lxgw-wenkai-medium.woff") format("woff");
+  font-weight: 500 700;
+  font-display: swap;
+}
 
 :root {
   color-scheme: dark;
@@ -12,11 +41,17 @@
   --sky-top: #04050e;
   --sky-mid: #0a0e2b;
   --sky-low: #160f35;
-  --horizon: rgb(255 150 120 / 0);
   --veil: 6 7 22;
+  /* Clouds of colour in the sky: faint ones in the four corners. */
+  --washes:
+    radial-gradient(58% 48% at 10% 6%, rgb(96 74 224 / 0.26), transparent 72%), radial-gradient(46% 42% at 94% 16%, rgb(214 72 152 / 0.09), transparent 72%),
+    radial-gradient(56% 46% at 84% 100%, rgb(22 164 172 / 0.09), transparent 72%), radial-gradient(48% 40% at 6% 100%, rgb(122 84 224 / 0.1), transparent 72%);
+  /* What the river of stars is painted in ("r g b" each), and its bright middle. */
+  --river: 142 156 255, 142 156 255, 168 150 255, 122 172 255, 222 162 236, 116 212 226;
+  --river-core: 214 216 255;
   --veil-top: 0.62;
   --veil-bottom: 0.86;
-  --glass: rgb(17 19 46 / 0.68);
+  --glass: rgb(17 19 46 / 0.7);
 
   --ink: rgb(255 255 255 / 0.95);
   --soft: rgb(228 232 255 / 0.7);
@@ -30,15 +65,18 @@
   --on-solid: #0b0d22;
 
   /* The four kinds of star, and the colour of what an agent remembers. */
-  --craft: #ffd166;
-  --strategy: #5eead4;
-  --lesson: #8ab4ff;
-  --trap: #ff8fb8;
-  --memory: #c4a7ff;
+  --craft: #f4d566;
+  --strategy: #79d6cc;
+  --lesson: #8ea8f0;
+  --trap: #f29a9c;
+  --memory: #b7a9e6;
   --accent: var(--lesson);
 
   --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
   --round: ui-rounded, "SF Pro Rounded", var(--sans);
+  /* What is read, and the interface's own titles. */
+  --hand: "dotjar Kai", "Kaiti SC", "STKaiti", var(--sans);
+  --display: "dotjar Ming", var(--hand);
   --star: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
 
   --gutter: clamp(24px, 4vw, 64px);
@@ -46,16 +84,29 @@
 }
 
 @media (prefers-color-scheme: light) {
-  /* dusk */
+  /* dusk: a deep slate-blue ground, and across the middle of it, where the
+     river runs, the colours of light held in glass: aqua to the left, denim
+     blue through the centre, rose to the right, each with a paler heart.
+     The fields are wide and low so that they lie along the river and read
+     as one band of light. Each is strong at its heart and only thins at its
+     edge, and the warm ones are kept vivid: laid on faintly, or greyed,
+     rose over blue goes to mud. */
   :root {
-    --sky-top: #121a4f;
-    --sky-mid: #2a2772;
-    --sky-low: #55307b;
-    --horizon: rgb(255 150 120 / 0.13);
-    --veil: 26 24 78;
+    --sky-top: #1a2440;
+    --sky-mid: #202c4a;
+    --sky-low: #253453;
+    --veil: 27 37 62;
+    --soft: rgb(230 236 246 / 0.76);
+    --faint: rgb(212 222 238 / 0.5);
+    --washes:
+      radial-gradient(22% 14% at 11% 72%, rgb(150 222 220 / 0.32), transparent 70%), radial-gradient(20% 13% at 91% 62%, rgb(246 214 180 / 0.28), transparent 70%),
+      radial-gradient(46% 32% at 7% 74%, rgb(70 166 180 / 0.76), transparent 68%), radial-gradient(44% 30% at 95% 57%, rgb(208 124 146 / 0.56), transparent 68%),
+      radial-gradient(62% 34% at 46% 58%, rgb(58 98 160 / 0.78), transparent 70%);
+    --river: 120 160 224, 120 160 224, 128 208 212, 176 208 232, 232 170 182, 246 224 196;
+    --river-core: 250 240 220;
     --veil-top: 0.66;
     --veil-bottom: 0.86;
-    --glass: rgb(30 28 82 / 0.66);
+    --glass: rgb(24 34 60 / 0.76);
   }
 }
 
@@ -154,11 +205,7 @@ body {
 .web .backdrop {
   display: block;
   background:
-    radial-gradient(60% 34% at 50% 104%, var(--horizon), transparent 72%),
-    radial-gradient(58% 48% at 10% 6%, rgb(96 74 224 / 0.34), transparent 72%),
-    radial-gradient(46% 42% at 94% 16%, rgb(214 72 152 / 0.19), transparent 72%),
-    radial-gradient(56% 46% at 84% 100%, rgb(22 164 172 / 0.2), transparent 72%),
-    radial-gradient(48% 40% at 6% 100%, rgb(122 84 224 / 0.2), transparent 72%),
+    var(--washes),
     linear-gradient(to bottom, var(--sky-top), var(--sky-mid) 56%, var(--sky-low));
 }
 .web .veil {
@@ -652,7 +699,7 @@ kbd {
   height: 62%;
   border-radius: 50%;
   background: var(--k, transparent);
-  opacity: 0.3;
+  opacity: 0.2;
   filter: blur(90px);
   transform: translate(-50%, -50%);
   transition: background-color 0.5s ease;
@@ -672,6 +719,20 @@ kbd {
   background: var(--glass);
   box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-edge);
   backdrop-filter: blur(30px) saturate(1.5);
+}
+
+/* The edge of the glass catches the light in colours. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(126 226 182 / 0.75), rgb(140 160 244 / 0.5) 30%, rgb(242 168 190 / 0.6) 58%, rgb(246 228 126 / 0.7) 82%, rgb(126 226 182 / 0.6));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* The cards before and after this one, just visible at the edges. */
@@ -1029,6 +1090,44 @@ kbd {
   user-select: text;
 }
 
+/* While records are being read: three stars taking turns to light up. */
+.reading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 30px;
+  margin-top: 4px;
+}
+.reading i {
+  width: 16px;
+  height: 16px;
+  background: var(--k);
+  clip-path: var(--star);
+  animation: reading 1.4s ease-in-out infinite;
+}
+.reading i:nth-child(1) {
+  --k: var(--strategy);
+}
+.reading i:nth-child(2) {
+  --k: var(--craft);
+  animation-delay: 0.22s;
+}
+.reading i:nth-child(3) {
+  --k: var(--trap);
+  animation-delay: 0.44s;
+}
+@keyframes reading {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) rotate(45deg);
+  }
+}
+
 /* While the model reads: a net going back and forth through a stretch of
    the river, and a star of each kind coming up out of it in turn. */
 .fishing {
@@ -1187,12 +1286,14 @@ kbd {
 
 /* ------------------------------------------------------------ the river */
 
-/* The first view: the day as a river of stars running down the sky, morning
-   at the top. Every question asked is one faint star in it, so the river is
-   wide and bright where the day was busy. Beside the point where each thing
+/* The first view: a window-wide galaxy, morning on the left (running down
+   the sky in narrow windows). Every question asked is one faint star in it,
+   so the river is wide and bright where the day was busy. Beside the point where each thing
    began sit the stars it yielded. */
 .overview {
-  width: min(1120px, 100%);
+  width: calc(100% + 2 * var(--gutter));
+  margin: 0 calc(-1 * var(--gutter));
+  overflow-x: hidden;
   max-height: 100%;
   display: flex;
   flex-direction: column;
@@ -1203,6 +1304,32 @@ kbd {
 }
 .overview::-webkit-scrollbar {
   display: none;
+}
+.overview > :not(.flow) {
+  max-width: min(1120px, 100% - 2 * var(--gutter));
+  flex-shrink: 0;
+}
+/* Long wrapped labels scroll with the action, which must not cover them. */
+.overview:has(.flow.is-wide) .overview-foot {
+  position: relative;
+}
+.overview > .growth {
+  max-width: min(820px, 100% - 2 * var(--gutter));
+}
+/* A line of verse over the day, before it has been gone through. */
+.epigraph {
+  margin: 0 0 16px;
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-size: 15px;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  color: var(--soft);
+}
+:lang(en) .epigraph {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-indent: 0;
 }
 .overview-title {
   margin: 0;
@@ -1217,14 +1344,14 @@ kbd {
 .growth {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 5px;
+  align-items: stretch;
+  gap: 8px;
   max-width: 820px;
   margin-top: 14px;
 }
 .growth-line {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 10px;
   margin: 0;
   padding: 0;
@@ -1235,6 +1362,41 @@ kbd {
   color: var(--soft);
   text-align: left;
 }
+.growth-content {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.growth-content span { overflow-wrap: anywhere; }
+.growth-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 3px 0 0;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.025);
+  cursor: pointer;
+}
+.growth-check:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
+.growth-check:checked { background: var(--c); border-color: var(--c); }
+.growth-check:checked::after { content: "✓"; position: absolute; inset: -2px 0 0; text-align: center; color: var(--sky-top); font: 600 13px/17px var(--sans); }
+.growth-check:focus-visible { outline: 2px solid var(--c); outline-offset: 4px; }
+.growth-line.is-read .growth-content { opacity: .5; }
+.growth-toggle { align-self: center; margin-top: 2px; font-size: 12.5px; color: var(--faint); }
+.growth-burst { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+.growth-burst i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px 1px currentColor; }
+.growth-burst i:nth-child(3n) { width: 7px; height: 7px; border-radius: 0; clip-path: var(--star); }
 .growth-line b {
   flex: none;
   padding: 0 9px;
@@ -1255,7 +1417,7 @@ kbd {
 .growth-line.is-applied {
   --c: var(--lesson);
 }
-button.growth-line:hover span {
+button.growth-content:hover span {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -1309,7 +1471,7 @@ button.growth-line:hover span {
 .flow {
   position: relative;
   flex: none;
-  width: 100%;
+  width: min(1120px, 100% - 2 * var(--gutter));
   margin-top: clamp(12px, 2.6vh, 30px);
   text-align: left;
 }
@@ -1329,18 +1491,20 @@ button.growth-line:hover span {
 }
 
 /* One small star per question. */
-.specks circle {
-  fill: #fff;
-}
+/* Each is a point of light with its own glow (see speck()); only how bright
+   it is, is set here. */
 .specks .s0 {
-  opacity: 0.4;
+  opacity: 0.5;
 }
 .specks .s1 {
-  fill: #cfe0ff;
-  opacity: 0.66;
+  opacity: 0.74;
 }
 .specks .s2 {
-  opacity: 0.92;
+  opacity: 1;
+}
+.specks .glint {
+  fill: #fff;
+  opacity: 0.8;
 }
 .specks .tw {
   animation: speck 3.4s ease-in-out infinite;
@@ -1359,6 +1523,12 @@ button.growth-line:hover span {
   font: 500 11.5px var(--round);
   fill: var(--faint);
   text-anchor: middle;
+}
+.flow.is-wide .ends.is-start {
+  text-anchor: end;
+}
+.flow.is-wide .ends.is-end {
+  text-anchor: start;
 }
 .tie {
   stroke: var(--line);
@@ -1477,6 +1647,14 @@ button.growth-line:hover span {
   position: absolute;
   width: var(--w, 300px);
 }
+.flow-item.is-up,
+.flow-item.is-down {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.flow.is-wide .flow-line > span {
+  min-width: 0;
+}
 .flow-item.is-left {
   text-align: right;
 }
@@ -1592,7 +1770,6 @@ button.growth-line:hover span {
     radial-gradient(1.2px 1.2px at 88% 91%, rgb(255 255 255 / 0.55), transparent 100%),
     radial-gradient(1.4px 1.4px at 15% 93%, rgb(190 210 255 / 0.6), transparent 100%),
     radial-gradient(1.1px 1.1px at 74% 44%, rgb(255 255 255 / 0.4), transparent 100%),
-    radial-gradient(70% 50% at 50% 108%, var(--horizon), transparent 70%),
     linear-gradient(to bottom, rgb(var(--veil) / 0.97), rgb(var(--veil) / 0.93));
   backdrop-filter: blur(26px);
   overflow-y: auto;
@@ -1606,7 +1783,7 @@ button.growth-line:hover span {
   width: min(70vw, 720px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(150 160 255 / 0.2), transparent);
+  background: radial-gradient(closest-side, rgb(140 170 215 / 0.14), transparent);
   transform: translate(-50%, -50%);
   animation: breathe 9s ease-in-out infinite;
   pointer-events: none;
@@ -1673,7 +1850,7 @@ button.growth-line:hover span {
   width: 100%;
   margin-top: clamp(22px, 6vh, 64px);
   padding: 22px 0 6px;
-  background: radial-gradient(46% 130% at 50% 100%, rgb(var(--veil) / 0.92) 30%, rgb(var(--veil) / 0) 72%);
+  background: linear-gradient(to bottom, transparent, rgb(var(--veil) / 0.98) 18px);
 }
 .rest-foot .btn {
   background: rgb(255 255 255 / 0.1);
@@ -1953,6 +2130,7 @@ button.growth-line:hover span {
     transition-duration: 0.01ms !important;
   }
   .twinkles i,
+  .reading i,
   .specks .tw,
   .star.is-open .halo,
   .f-net,
@@ -1965,3 +2143,97 @@ button.growth-line:hover span {
     opacity: 1;
   }
 }
+
+/* ----------------------------------------------------------------- type */
+
+/* The interface's own titles, and the line of verse, in the Ming face. */
+.overview-title,
+.card.is-lead .card-title,
+.card.is-list .card-title,
+.rest-head,
+.recap-title,
+.epigraph {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.overview-title {
+  font-size: clamp(31px, 3.2vw, 46px);
+}
+.epigraph {
+  letter-spacing: 0.5em;
+}
+
+/* What the day's work turned up, in the hand: any character may be in it. */
+.card-title,
+.peek-title,
+.flow-title,
+.thing-title,
+.row-title,
+.md,
+.payoff,
+.lead-text,
+.growth-line span,
+.flow-line span,
+.rest-line,
+.thing p span {
+  font-family: var(--hand);
+}
+.card-title,
+.peek-title,
+.flow-title,
+.thing-title {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+/* The hand runs small beside the system's face, so where it is used the
+   sizes go up a step. */
+:lang(zh) .card:not(.is-lead):not(.is-list) .card-title {
+  font-size: clamp(29px, 2.7vw, 39px);
+}
+:lang(zh) .card:not(.is-lead):not(.is-list) .card-title.is-long {
+  font-size: clamp(25px, 2.25vw, 32px);
+}
+:lang(zh) .flow-title {
+  font-size: 17.5px;
+}
+:lang(zh) .md {
+  font-size: 16.5px;
+  line-height: 1.9;
+}
+/* The hand has no bold; what a draft marks out is marked in the kind's colour. */
+.md strong {
+  font-weight: 500;
+  color: var(--k, var(--ink));
+}
+:lang(zh) .growth-line span,
+:lang(zh) .flow-line span {
+  font-size: 14.5px;
+}
+
+/* In English there is nothing for the Chinese faces to do. */
+:lang(en) {
+  --hand: var(--sans);
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+:lang(en) .epigraph {
+  letter-spacing: 0.02em;
+}
+
+/* A quiet entry; update details only occupy space when requested. */
+.update-dialog { width: min(480px, calc(100vw - 48px)); max-height: 80vh; overflow: auto; padding: 28px; border: 1px solid #ffffff30; border-radius: 22px; background: #202b43; color: #edf0f8; box-shadow: 0 20px 90px #0006; font: 15px/1.65 system-ui, sans-serif; }
+.update-dialog::backdrop { background: #090f2299; backdrop-filter: blur(5px); }
+.update-dialog h2 { font: 600 22px/1.4 system-ui, sans-serif; margin: 0 0 18px; }
+.update-dialog h3 { font-size: 17px; }
+.update-dialog p { margin: 12px 0; }
+.update-dialog code { user-select: all; font-size: 13px; }
+.update-muted { opacity: .65; font-size: 13px; }
+.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.update-error { color: #ffc2ae; overflow-wrap: anywhere; }
+.update-progress { color: #9cded6; }
+.update-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.update-action { border: 1px solid #ffffff35; background: #ffffff12; color: inherit; padding: 7px 12px; border-radius: 12px; cursor: pointer; font: inherit; }
+.update-action:disabled { opacity: .45; cursor: wait; }
+.update-action:focus-visible, .update-auto input:focus-visible { outline: 2px solid #9cded6; outline-offset: 3px; }
+.update-close { float: right; font-size: 13px; }
+.update-auto { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }

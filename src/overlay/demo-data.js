@@ -354,6 +354,7 @@
     const rest = { enabled: scene === "rest" || scene === "resting", everyMin: 50, forMin: 5, phase: "idle", startedAt: 0, endsAt: 0, count: 2 };
     const beginRest = (elapsed, left) => Object.assign(rest, { phase: "resting", startedAt: Date.now() - elapsed, endsAt: Date.now() + left });
     if (scene === "rest") beginRest(252000, 48000);
+    if (scene === "rested") beginRest(300000, -1000);
     if (scene === "resting") beginRest(39000, 261000);
     const restStatus = () =>
       Promise.resolve({

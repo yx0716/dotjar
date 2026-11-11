@@ -12,6 +12,9 @@ const { spawn } = require("child_process");
 
 const config = require("./core/config");
 const { createSession } = require("./core/session");
+const { createRestWindow } = require("./rest-window");
+const updates = require("./update/manager");
+const operations = require("./core/operations");
 
 const DEFAULT_PORT = 4747;
 const COOKIE = "dotjar_token";
@@ -51,8 +54,13 @@ const STATIC = {
   "/overlay.js": ["overlay.js", "text/javascript; charset=utf-8"],
   "/markdown.js": ["markdown.js", "text/javascript; charset=utf-8"],
   "/words.js": ["words.js", "text/javascript; charset=utf-8"],
+  "/growth.js": ["growth.js", "text/javascript; charset=utf-8"],
+  "/updates.js": ["updates.js", "text/javascript; charset=utf-8"],
   "/demo-data.js": ["demo-data.js", "text/javascript; charset=utf-8"],
   "/web-bridge.js": ["web-bridge.js", "text/javascript; charset=utf-8"],
+  "/fonts/huiwen-mincho-titles.woff": ["fonts/huiwen-mincho-titles.woff", "font/woff"],
+  "/fonts/lxgw-wenkai-regular.woff": ["fonts/lxgw-wenkai-regular.woff", "font/woff"],
+  "/fonts/lxgw-wenkai-medium.woff": ["fonts/lxgw-wenkai-medium.woff", "font/woff"],
 };
 
 function tokenPath() {
@@ -122,7 +130,31 @@ const PAGE_SEEN_FOR = 100 * 1000;
 
 function createApi(session, options = {}) {
   const page = options.page || { seenAt: 0, visible: false, notifies: false };
+  const restAction = (name) => {
+    const status = session.rest[name]();
+    if (options.restChanged) options.restChanged(status, name === "start");
+    return status;
+  };
   return {
+    updateStatus: () => updates.status(),
+    updateCheck: () => updates.check(),
+    updatePreferences: (patch) => updates.preferences(patch),
+    updateInstall: (version) => updates.start(version),
+    updateReady: () => ({ ready: !session.isDistilling() && session.rest.status().phase === "idle" }),
+    updateHealth: () => {
+      const os = require("os");
+      const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-health-"));
+      try { fs.writeFileSync(path.join(scratch, "probe"), "ok", { flag: "wx" }); }
+      finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+      return { version: require("../package.json").version, root: process.env.DOTJAR_MANAGED_ROOT || null, dataDir: config.dataDir(), schema: 1 };
+    },
+    updateStop: (id) => {
+      const gate = operations.read(operations.gateFile());
+      if (!process.env.DOTJAR_MANAGED_ROOT || !gate || gate.id !== id || operations.active().length) throw new Error("更新尚未就绪");
+      if (!options.updateStop) throw new Error("此服务不支持更新切换");
+      setTimeout(options.updateStop, 100);
+      return true;
+    },
     meta: () => ({
       demo: false,
       web: true,
@@ -156,10 +188,10 @@ function createApi(session, options = {}) {
       return session.rest.status();
     },
     restRecap: () => session.rest.recap(),
-    restStart: () => session.rest.start(),
-    restSkip: () => session.rest.skip(),
-    restSnooze: () => session.rest.snooze(),
-    restDone: () => session.rest.done(),
+    restStart: () => restAction("start"),
+    restSkip: () => restAction("skip"),
+    restSnooze: () => restAction("snooze"),
+    restDone: () => restAction("done"),
     setRest: (patch) => session.rest.set(patch),
     removeFromLibrary: (file) => session.removeFromLibrary(file),
     restoreToLibrary: (undo) => session.restoreToLibrary(undo),
@@ -181,18 +213,31 @@ function createServer(options = {}) {
   // What is known of the page in the browser, for deciding who shows a rest.
   const page = { seenAt: 0, visible: false, notifies: false };
   let httpServer = null;
-  // A rest fell due. A page that is on screen shows it by itself, and one in
-  // the background that may send notifications calls the person over; with
-  // neither, the page is opened in the browser, in front.
-  const onRestDue = () => {
-    const open = Date.now() - page.seenAt < PAGE_SEEN_FOR;
-    if (open && (page.visible || page.notifies)) return;
+  const restWindow = options.restWindow || createRestWindow();
+  const token = options.token || loadToken();
+  const onRestDue = (status) => {
     const address = httpServer && httpServer.address();
-    if (address) openInBrowser(`http://127.0.0.1:${address.port}/?rest=1`);
+    if (!address) return;
+    const url = `http://127.0.0.1:${address.port}/?rest=1&t=${token}`;
+    restWindow.show(`${url}&nativeRest=1`, status, () => {
+      const open = Date.now() - page.seenAt < PAGE_SEEN_FOR;
+      // On macOS even a visible tab may be covered by another app.
+      if (process.platform !== "darwin" && open && (page.visible || page.notifies)) return;
+      (options.openInBrowser || openInBrowser)(url);
+    });
   };
   const session = options.session || createSession(options.watchRest ? { onRestDue } : {});
-  const token = options.token || loadToken();
-  const api = createApi(session, { restartable: options.restartable, restart: () => relaunch(httpServer), page });
+  const api = createApi(session, { restartable: options.restartable, restart: () => relaunch(httpServer), page,
+    updateStop: () => {
+      restWindow.close();
+      httpServer.close(() => { require("./service").clearPid(); process.exit(0); });
+      httpServer.closeAllConnections();
+    },
+    restChanged: (status, start) => {
+      restWindow.sync(status);
+      if (start && options.watchRest) onRestDue(status);
+    },
+  });
 
   httpServer = http.createServer(async (req, res) => {
     try {
@@ -223,7 +268,8 @@ function createServer(options = {}) {
         if (url.pathname === "/library") return send(res, 200, "text/html; charset=utf-8", fs.readFileSync(session.library()));
         if (url.pathname === "/icon.png") return send(res, 200, "image/png", fs.readFileSync(path.join(__dirname, "..", "assets", "icon.png")));
         const hit = STATIC[url.pathname];
-        if (hit) return send(res, 200, hit[1], fs.readFileSync(path.join(OVERLAY, hit[0])));
+        // A font is megabytes and does not change between one look and the next: the browser may keep it for a day.
+        if (hit) return send(res, 200, hit[1], fs.readFileSync(path.join(OVERLAY, hit[0])), hit[1] === "font/woff" ? { "cache-control": "private, max-age=86400" } : {});
         return send(res, 404, "text/plain; charset=utf-8", "not found");
       }
 
@@ -253,12 +299,21 @@ function createServer(options = {}) {
       else res.end();
     }
   });
-  // The server that stays running keeps the time between rests.
-  if (options.watchRest && session.rest) {
-    const timer = setInterval(() => session.rest.tick().catch(() => {}), 30 * 1000);
-    timer.unref();
-    httpServer.on("close", () => clearInterval(timer));
+  if (options.watchRest) {
+    const stopUpdates = updates.watch();
+    httpServer.once("close", stopUpdates);
   }
+  // The server that stays running keeps the time between rests.
+  if (options.watchRest && session.rest) httpServer.once("listening", () => {
+    const shutdown = () => restWindow.close();
+    process.on("exit", shutdown);
+    const timer = setInterval(() => session.rest.tick().catch(() => {}), 30 * 1000);
+    const guard = setInterval(() => restWindow.sync(session.rest.status()), 1000);
+    timer.unref();
+    guard.unref();
+    httpServer.on("close", () => { clearInterval(timer); clearInterval(guard); process.removeListener("exit", shutdown); });
+  });
+  httpServer.on("close", () => restWindow.close());
   return httpServer;
 }
 
@@ -324,7 +379,7 @@ async function start(options = {}) {
       const bound = await listen(server, port);
       return { server, port: bound, url: `http://127.0.0.1:${bound}/?t=${token}`, reused: false };
     } catch (err) {
-      if (err.code !== "EADDRINUSE") throw err;
+      if (err.code !== "EADDRINUSE" || process.env.DOTJAR_MANAGED_ROOT) throw err;
       if (await isOurs(port, token)) return { server: null, port, url: `http://127.0.0.1:${port}/?t=${token}`, reused: true };
     }
   }

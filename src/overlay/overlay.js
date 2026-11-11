@@ -39,6 +39,11 @@
   const MOON = `<svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 12.4A7 7 0 0 1 7.6 4 7 7 0 1 0 16 12.4z"/></svg>`;
 
   const params = new URLSearchParams(location.search);
+  const growthStore = window.DotjarGrowth.createStore(() => window.localStorage, `dotjar.growth.read.v1${!host || host.demo ? ".demo" : ""}`);
+  let growthExpandedDay = null;
+  let growthBusy = false;
+  const nativeRest = params.has("nativeRest") && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dotjarRest;
+  const tellRestWindow = (message) => { if (nativeRest) nativeRest.postMessage(message); };
   // All the interface's text, in the language and wording in use. Until the
   // host says otherwise, the language is the browser's.
   let T = window.DotjarWords.copy(params.get("lang") || navigator.language, params.get("words"));
@@ -146,6 +151,38 @@
 
   function reducedMotion() {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  // One question asked, as a point of light: a small bright heart with a
+  // soft glow round it, and on the brightest a faint glint. Drawn as a flat
+  // disc, a few dozen of them look like flecks of dust on the glass.
+  const SPECK_LIGHT = [["white", "#fff"], ["cool", "#cfe0ff"], ["warm", "#ffeccf"]]
+    .map(
+      ([name, colour]) =>
+        `<radialGradient id="speck-${name}"><stop offset="0" stop-color="#fff"/><stop offset="0.22" stop-color="${colour}" stop-opacity="0.95"/>` +
+        `<stop offset="0.36" stop-color="${colour}" stop-opacity="0.3"/><stop offset="1" stop-color="${colour}" stop-opacity="0"/></radialGradient>`
+    )
+    .join("");
+
+  function speck(x, y, heart, rnd) {
+    const f = (n) => n.toFixed(1);
+    const tone = ["white", "white", "white", "cool", "warm"][Math.floor(rnd() * 5)];
+    const level = Math.floor(rnd() * 3);
+    const twinkles = rnd() < 0.16 ? " tw" : "";
+    const glint = level === 2 && heart > 1.15 ? `<path class="glint" d="${STAR}" transform="translate(${f(x)} ${f(y)}) scale(${f(heart * 2.8)})"/>` : "";
+    return `<g class="s${level}${twinkles}"><circle cx="${f(x)}" cy="${f(y)}" r="${f(heart * 3.4)}" fill="url(#speck-${tone})"/>${glint}</g>`;
+  }
+
+  // The colours the river is painted in, the last of them its bright middle.
+  // They live in the stylesheet with the rest of the palette, so that the
+  // river changes with the sky when the system goes from light to dark.
+  function riverTints() {
+    const css = getComputedStyle(document.documentElement);
+    const rgb = (text) => String(text).trim().split(/\s+/).join(",");
+    const valid = (c) => /^\d+,\d+,\d+$/.test(c);
+    const body = css.getPropertyValue("--river").split(",").map(rgb).filter(valid);
+    const core = rgb(css.getPropertyValue("--river-core"));
+    return [...(body.length ? body : ["142,156,255"]), valid(core) ? core : "214,216,255"];
   }
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -340,9 +377,12 @@
       if (state.error) {
         lead(T.loadFail, `<p class="lead-error">${esc(state.error)}</p><div class="card-foot"><button class="btn primary" type="button" data-act="reload">${esc(T.reload)} <kbd>↵</kbd></button></div>`);
       } else {
-        lead(T.loading, "");
+        lead(T.loading, reading());
       }
       return;
+    }
+    if (state.switching) {
+      return lead(T.switchingTo(T.date(state.switching)), `<p class="lead-text">${esc(T.switchingText)}</p>${reading()}`);
     }
     if (state.phase === "distilling") {
       if (state.batch) return lead(T.batching, `<p class="lead-text">${esc(T.batchText(state.batch.total))}</p>${fishing()}`);
@@ -512,6 +552,11 @@
     el.status.innerHTML = parts.join("");
   }
 
+  // While records are being read: three stars taking turns to light up.
+  function reading() {
+    return `<div class="reading" aria-hidden="true"><i></i><i></i><i></i></div>`;
+  }
+
   // While the model reads: a net going back and forth through a stretch of
   // the river, and a star of each kind coming up out of it in turn.
   function fishing() {
@@ -556,19 +601,10 @@
       // Work kept coming after the last pass: offer to pick up what is new.
       if (v.turnsSince) foot += ` <button class="btn" type="button" data-act="distill">${esc(T.refreshNew(v.turnsSince))} <kbd>R</kbd></button>`;
     }
-    const g = v.tasksAreRough ? null : v.growth;
-    const colon = T.lang === "zh" ? "：" : ": ";
-    const growth = g
-      ? `<div class="growth">` +
-        (g.highlight ? `<p class="growth-line is-good"><b>${esc(T.growthGood)}</b><span>${esc(g.highlight)}</span></p>` : "") +
-        (g.applied || [])
-          .map((a, i) => `<button class="growth-line is-applied" type="button" data-act="applied" data-n="${i}"><b>${esc(T.growthUsed)}</b><span>${esc(T.growthUsedText(a.title))}${a.how ? colon + esc(a.how) : ""}</span></button>`)
-          .join("") +
-        (g.next ? `<p class="growth-line is-next"><b>${esc(T.growthNext)}</b><span>${esc(g.next)}</span></p>` : "") +
-        `</div>`
-      : "";
+    const growth = renderGrowth(v);
     el.stage.innerHTML = `
       <section class="overview">
+        ${v.tasksAreRough ? `<p class="epigraph">${esc(T.epigraph)}</p>` : ""}
         <h2 class="overview-title">${esc(title)}</h2>
         ${growth}
         <p class="overview-key">${key}</p>
@@ -584,7 +620,90 @@
     const overview = el.stage.querySelector(".overview");
     const box = getComputedStyle(el.stage);
     const room = el.stage.clientHeight - parseFloat(box.paddingTop) - parseFloat(box.paddingBottom) - overview.scrollHeight;
-    drawGalaxy(overview.querySelector(".flow"), v.tasks, v.activity, v.dots || [], arriving, Math.min(600, Math.max(300, room - 4)));
+    const flow = overview.querySelector(".flow");
+    const wide = flow.clientWidth >= 760;
+    drawGalaxy(flow, v.tasks, v.activity, v.dots || [], arriving, Math.min(wide ? 500 : 600, Math.max(wide ? 380 : 300, room - 4)));
+  }
+
+  function renderGrowth(v) {
+    const rows = window.DotjarGrowth.entries(v.tasksAreRough ? null : v.growth);
+    if (!rows.length) return "";
+    const expanded = growthExpandedDay === v.day;
+    const count = rows.filter((row) => growthStore.has(v.day, row.key)).length;
+    const colon = T.lang === "zh" ? "：" : ": ";
+    return `<div class="growth">${rows.map((row, i) => {
+      const read = growthStore.has(v.day, row.key);
+      if (read && !expanded) return "";
+      const label = { good: T.growthGood, applied: T.growthUsed, next: T.growthNext }[row.kind];
+      const text = row.kind === "applied" ? T.growthUsedText(row.title) + (row.text ? colon + row.text : "") : row.text;
+      const body = `<b>${esc(label)}</b><span>${esc(text)}</span>`;
+      return `<div class="growth-line is-${row.kind}${read ? " is-read" : ""}" data-growth-row="${i}">
+        <input class="growth-check" type="checkbox" data-growth-read="${i}" ${read ? "checked" : ""} ${growthBusy ? "disabled" : ""} aria-label="${esc((read ? T.growthUnread : T.growthRead) + colon + text)}" title="${esc(T.growthReadHint)}">
+        ${row.kind === "applied" ? `<button class="growth-content" type="button" data-act="applied" data-n="${row.n}">${body}</button>` : `<div class="growth-content">${body}</div>`}
+      </div>`;
+    }).join("")}${count ? `<button class="growth-toggle link" type="button" data-act="growthToggle" aria-expanded="${expanded}">${esc(expanded ? T.growthCollapse : T.growthHidden(count))}</button>` : ""}</div>`;
+  }
+
+  // Small sparks lift out of the words, then leave the sky quiet again.
+  async function scatterGrowth(row, applied) {
+    if (reducedMotion() || document.hidden || !row.animate) return;
+    const layer = document.createElement("div");
+    layer.className = "growth-burst";
+    layer.setAttribute("aria-hidden", "true");
+    const text = row.querySelector(".growth-content span");
+    const rects = text ? [...text.getClientRects()] : [row.getBoundingClientRect()];
+    const color = getComputedStyle(row).getPropertyValue("--c");
+    document.body.appendChild(layer);
+    const animations = [];
+    try {
+      for (let i = 0; i < (applied ? 42 : 14); i++) {
+        const box = rects[i % rects.length];
+        const spark = document.createElement("i");
+        spark.style.left = `${box.left + Math.random() * box.width}px`;
+        spark.style.top = `${box.top + Math.random() * box.height}px`;
+        spark.style.color = color;
+        layer.appendChild(spark);
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 20 + Math.random() * (applied ? 85 : 30);
+        const dx = Math.cos(angle) * distance;
+        const dy = Math.sin(angle) * distance * 0.6 - 25;
+        const size = 0.6 + Math.random() * 0.9;
+        animations.push(spark.animate([
+          { opacity: 0, transform: `translate(0,0) scale(${size * 0.3})` },
+          { opacity: 0.85, offset: 0.18, transform: `translate(${dx * 0.18}px,${dy * 0.18}px) scale(${size})` },
+          { opacity: 0, transform: `translate(${dx}px,${dy}px) scale(0.1)` },
+        ], { duration: 520 + Math.random() * 260, easing: "cubic-bezier(.15,.6,.3,1)", fill: "both" }));
+      }
+      animations.push(row.animate([{ opacity: 1, filter: "blur(0)" }, { opacity: 0, filter: "blur(3px)", transform: "translateY(-4px)" }], { duration: 420, fill: "forwards" }));
+      await Promise.race([Promise.all(animations.map((a) => a.finished.catch(() => {}))), sleep(850)]);
+    } finally {
+      animations.forEach((a) => a.cancel());
+      layer.remove();
+    }
+  }
+
+  async function readGrowth(input) {
+    if (growthBusy || !state.view) return;
+    const day = state.view.day;
+    const rows = window.DotjarGrowth.entries(state.view.growth);
+    const row = rows[Number(input.dataset.growthRead)];
+    if (!row) return;
+    const seen = input.checked;
+    const saved = growthStore.set(day, row.key, seen);
+    if (seen || !rows.some((item) => growthStore.has(day, item.key))) growthExpandedDay = null;
+    growthBusy = true;
+    el.stage.querySelectorAll(".growth-check").forEach((item) => item.disabled = true);
+    try {
+      if (seen) await scatterGrowth(input.closest(".growth-line"), row.kind === "applied");
+    } finally {
+      growthBusy = false;
+      if (state.tab === "today" && state.view && state.view.day === day && state.phase === "ready") {
+        renderOverview(state.view);
+        const next = el.stage.querySelector(`.growth-check[data-growth-read="${Number(input.dataset.growthRead) + 1}"]`) || el.stage.querySelector(".growth-toggle") || el.stage.querySelector(".growth-check");
+        if (next) next.focus({ preventScroll: true });
+      }
+      if (!saved) toast(T.growthLocalOnly);
+    }
   }
 
   // Minutes into the work day for "HH:MM"; small hours belong to the day before.
@@ -600,13 +719,244 @@
     return `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
   }
 
+  // Wide windows: the galaxy belongs to the whole sky, with time flowing
+  // left to right. Keep the original tall rendering below for narrow windows.
+  function drawGalaxy(box, tasks, activity, dots, arriving, height) {
+    if (box.clientWidth < 760) return drawGalaxyTall(box, tasks, activity, dots, arriving, height);
+    const W = box.clientWidth;
+    const vw = window.innerWidth;
+    const H = Math.round(height);
+    const x0 = 70;
+    const x1 = W - 70;
+    const left = (W - vw) / 2;
+    const cyAt = (x) => {
+      const k = (x - W / 2) / (vw / 2);
+      return H / 2 + 44 * k * k - 6 * k;
+    };
+    const times = [];
+    if (activity) times.push(minutesOf(activity.from), minutesOf(activity.to));
+    for (const t of tasks) times.push(minutesOf(t.from), minutesOf(t.to));
+    const known = times.filter((t) => t != null);
+    const t0 = known.length ? Math.min(...known) : 9 * 60;
+    const t1 = Math.max(t0 + 60, known.length ? Math.max(...known) : 18 * 60);
+    const placed = tasks.map((t, i) => ({ t, i, at: minutesOf(t.from), dots: dots.filter((d) => d.task === i) }));
+    placed.sort((p, q) => (p.at == null) - (q.at == null) || (p.at || 0) - (q.at || 0));
+    const loose = dots.filter((d) => d.task < 0 || d.task >= tasks.length);
+    if (loose.length) placed.push({ t: null, i: -1, at: null, dots: loose });
+
+    // Reserve the width of the last label before placing any task. Normally
+    // same-side labels get 238px; tighten to 140px words only when necessary.
+    let labelWidth = 220;
+    let gap = 84;
+    const offsets = () => placed.map((p, n) => Math.floor(n / 2) * Math.max(labelWidth + 18, 2 * gap) + (n % 2) * gap);
+    let offsetsAt = offsets();
+    while (labelWidth > 140 && x0 + offsetsAt.at(-1) + 12 + labelWidth > W) {
+      labelWidth--;
+      offsetsAt = offsets();
+    }
+    const end = Math.min(x1, W - labelWidth - 12);
+    const crowded = x0 + offsetsAt.at(-1) > end;
+    if (crowded) gap = (end - x0) / Math.max(1, placed.length - 1);
+    // Backward bounds leave space for all later labels, then a forward pass
+    // stays as close as possible to each task's actual start time.
+    const caps = new Array(placed.length);
+    for (let n = placed.length - 1; n >= 0; n--) {
+      caps[n] = Math.min(end, n + 1 < placed.length ? caps[n + 1] - gap : end,
+        !crowded && n + 2 < placed.length ? caps[n + 2] - labelWidth - 18 : end);
+    }
+    placed.forEach((p, n) => {
+      const want = p.at != null ? x0 + ((p.at - t0) / (t1 - t0)) * (x1 - x0)
+        : p.t ? x0 + ((n + 0.5) / placed.length) * (x1 - x0) : end;
+      const min = Math.max(x0, n ? placed[n - 1].x + gap : x0,
+        !crowded && n > 1 ? placed[n - 2].x + labelWidth + 18 : x0);
+      p.x = Math.max(min, Math.min(want, caps[n]));
+    });
+    const marks = [[x0, t0], ...placed.filter((p) => p.at != null).map((p) => [p.x, p.at]), [x1, t1]];
+    const xAt = (t) => {
+      if (t <= t0) return x0;
+      for (let k = 1; k < marks.length; k++) {
+        const [xa, ta] = marks[k - 1];
+        const [xb, tb] = marks[k];
+        if (t <= tb) return tb > ta ? xa + ((t - ta) / (tb - ta)) * (xb - xa) : xb;
+      }
+      return x1;
+    };
+    const a0 = activity ? minutesOf(activity.from) : null;
+    const spans = (activity && activity.bins || []).map((count, k) => ({ count, xa: xAt(a0 + k * 30), xb: xAt(a0 + (k + 1) * 30) }));
+
+    // The SVG and the canvas share these smoothed width/brightness samples.
+    const STEP = 4;
+    const samples = Math.ceil(vw / STEP) + 2;
+    const wide = new Float32Array(samples);
+    const glow = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) {
+      const x = left + i * STEP;
+      wide[i] = 46;
+      glow[i] = 0.4;
+      for (const sp of spans) {
+        if (!sp.count) continue;
+        const reach = (sp.xb - sp.xa) / 2 + 40;
+        const near = Math.exp(-Math.pow((x - (sp.xa + sp.xb) / 2) / reach, 2));
+        wide[i] = Math.max(wide[i], 46 + Math.min(50, sp.count * 8) * near);
+        glow[i] = Math.max(glow[i], 0.4 + Math.min(0.6, 0.18 + sp.count * 0.08) * near);
+      }
+    }
+    for (const arr of [wide, glow]) {
+      for (let pass = 0; pass < 2; pass++) {
+        const src = Float32Array.from(arr);
+        for (let i = 0; i < samples; i++) {
+          let sum = 0;
+          let count = 0;
+          for (let k = -4; k <= 4; k++) if (i + k >= 0 && i + k < samples) (sum += src[i + k]), count++;
+          arr[i] = sum / count;
+        }
+      }
+    }
+    const at = (arr, x) => {
+      const pos = Math.max(0, Math.min(samples - 1.001, (x - left) / STEP));
+      const i = Math.floor(pos);
+      return arr[i] + (arr[i + 1] - arr[i]) * (pos - i);
+    };
+    const halfAt = (x) => at(wide, x);
+    const glowAt = (x) => at(glow, x);
+    let rowUp = Infinity;
+    let rowDown = -Infinity;
+    for (let x = x0; x <= x1; x++) {
+      rowUp = Math.min(rowUp, cyAt(x) - halfAt(x) - 16);
+      rowDown = Math.max(rowDown, cyAt(x) + halfAt(x) + 16);
+    }
+    const f = (n) => n.toFixed(1);
+    const R = 13;
+    const clusters = placed.map((p) => {
+      const x = p.x;
+      p.y = cyAt(x);
+      const shown = p.dots.slice(0, 8);
+      const k = shown.length;
+      const ring = k <= 1 ? 0 : R * (0.72 + 0.22 * k);
+      const at = shown.map((d, j) => {
+        const a = (k === 2 ? 0 : -Math.PI / 2) + (j / Math.max(1, k)) * Math.PI * 2;
+        return [x + ring * Math.cos(a), p.y + ring * Math.sin(a)];
+      });
+      const parts = shown.map((d, j) => {
+        const size = d.status === "skipped" ? R * 0.5 : R;
+        const label = [T.kinds[d.kind], d.title].filter(Boolean).join(" · ");
+        return `<g class="star is-${d.status}" data-kind="${esc(d.kind)}" data-act="dot" data-id="${esc(d.id)}" transform="translate(${f(at[j][0])} ${f(at[j][1])})"><title>${esc(label)}</title><g class="inner">` +
+          `<circle class="halo" r="${f(R * 1.2)}" filter="url(#glow)"/>` +
+          `<path class="body" d="${STAR}" transform="scale(${f(size)})"/>` +
+          `<circle class="core" r="${f(R * 0.15)}"/>` +
+          `<circle class="hoop" r="${f(R * 1.45)}"/>` +
+          `<circle class="hit" r="${f(R * 1.3)}"/></g></g>`;
+      });
+      // The stars of one thing are joined up, like a small constellation.
+      if (k >= 2) parts.unshift(`<polyline class="constel" points="${[...at, ...(k > 2 ? [at[0]] : [])].map(([px, py]) => `${f(px)},${f(py)}`).join(" ")}"/>`);
+      // A thing that left nothing to keep still marks its place.
+      if (!k) parts.push(`<circle class="mark" cx="${f(x)}" cy="${f(p.y)}" r="4.5"/>`);
+      const reach = (k ? ring + R : 5) + 6;
+      return { p, x, reach, html: parts.join("") };
+    });
+
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const taken = clusters.map((c) => [c.x, c.p.y, c.reach + 4]);
+    const specks = [];
+    spans.forEach((sp) => {
+      const html = [];
+      for (let n = 0; n < sp.count; n++) {
+        const r = 0.85 + rnd() * rnd() * 1.25; // mostly small, a few larger; always a little more than the dust
+        for (let tries = 0; tries < 160; tries++) {
+          const x = sp.xa + rnd() * (sp.xb - sp.xa);
+          const side = rnd() * 2 - 1;
+          const y = cyAt(x) + Math.sign(side) * Math.pow(Math.abs(side), 1.5) * 0.8 * halfAt(x);
+          if (taken.some(([tx, ty, tr]) => Math.hypot(x - tx, y - ty) < r + tr + 1.4)) continue;
+          taken.push([x, y, r]);
+          html.push(speck(x, y, r, rnd));
+          break;
+        }
+      }
+      if (html.length) specks.push({ x: (sp.xa + sp.xb) / 2, html: html.join("") });
+    });
+    const cards = [];
+    clusters.forEach((c, n) => {
+      const { p } = c;
+      const side = n % 2 === 0 ? "up" : "down";
+      let html;
+      if (!p.t) {
+        html = `<div class="flow-item is-${side}"><p class="flow-line is-count"><span>${esc(T.dotsLoose(p.dots.length))}</span></p></div>`;
+      } else {
+        const t = p.t;
+        const when = t.from ? (t.to && t.to !== t.from ? `${t.from}–${t.to}` : t.from) : "";
+        const where = [t.project, T.asks(t.asks || 0)].filter(Boolean).join(T.lang === "zh" ? "，" : ", ");
+        const body = t.share
+          ? `<p class="flow-line"><b class="who is-you">${esc(T.you)}</b><span>${esc(t.human)}</span></p>
+             <p class="flow-line"><b class="who is-ai">${esc(T.ai)}</b><span>${esc(t.ai)}</span></p>` +
+            (t.doubt ? `<p class="flow-line"><b class="who is-doubt">${esc(T.doubt)}</b><span>${esc(t.doubt)}</span></p>` : "")
+          : `<p class="flow-line is-count"><span>${esc(where)}</span></p>`;
+        html = `<div class="flow-item is-${side}">${when ? `<p class="flow-time">${esc(when)}</p>` : ""}<p class="flow-title">${esc(t.title)}</p>${body}</div>`;
+      }
+      const next = clusters[n + 2];
+      const width = Math.max(140, Math.min(220, next ? next.x - c.x - 18 : labelWidth));
+      cards.push({ side, x: c.x + 12, width, html });
+    });
+    box.classList.add("is-wide");
+    box.classList.toggle("is-arriving", Boolean(arriving));
+    box.style.height = `${H}px`;
+    box.innerHTML = `
+      <canvas class="current" aria-hidden="true"></canvas>
+      <svg class="galaxy" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+        <defs><filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="6"/></filter>${SPECK_LIGHT}</defs>
+        <g class="specks" aria-hidden="true">${specks.map((g) => `<g class="ht-row">${g.html}</g>`).join("")}</g>
+        <text class="ends is-start" x="${x0 - 12}" y="${f(cyAt(x0) + 4)}" aria-hidden="true">${esc(hhmmOf(t0))}</text>
+        <text class="ends is-end" x="${x1 + 12}" y="${f(cyAt(x1) + 4)}" aria-hidden="true">${esc(hhmmOf(t1))}</text>
+        <g aria-hidden="true">${clusters.map((c) => `<line class="tie" x1="${f(c.x)}" x2="${f(c.x)}"/>`).join("")}</g>
+        ${clusters.map((c) => `<g class="cluster">${c.html}</g>`).join("")}
+      </svg>
+      ${cards.map((c) => c.html).join("")}`;
+    const delay = (x) => `${((x / W) * 1.1).toFixed(2)}s`;
+    box.querySelectorAll(".ht-row").forEach((g, n) => (g.style.animationDelay = delay(specks[n].x)));
+    box.querySelectorAll(".specks .tw").forEach((c, n) => (c.style.animationDelay = `${((n * 0.83) % 3.4).toFixed(2)}s`));
+    box.querySelectorAll(".cluster").forEach((g, n) => (g.style.animationDelay = delay(clusters[n].x)));
+    const nodes = [...box.querySelectorAll(".flow-item")];
+    const ties = box.querySelectorAll(".tie");
+    // Measure wrapped words before reserving space above/below the flow. A
+    // short window can scroll vertically without clipping a long English label.
+    nodes.forEach((node, n) => {
+      node.style.left = `${cards[n].x}px`;
+      node.style.setProperty("--w", `${cards[n].width}px`);
+      node.style.animationDelay = delay(clusters[n].x);
+    });
+    let above = 0;
+    let below = H;
+    nodes.forEach((node, n) => {
+      const c = cards[n];
+      const up = c.side === "up";
+      c.edge = up ? rowUp : rowDown;
+      c.height = node.offsetHeight;
+      // An unusually crowded day cannot fit even 140px labels in two rows.
+      // Keep every word: move only colliding labels outward into another tier.
+      for (let j = 0; j < n; j++) {
+        const prev = cards[j];
+        if (prev.side !== c.side || prev.x + prev.width + 18 <= c.x + 0.5) continue;
+        c.edge = up ? Math.min(c.edge, prev.edge - prev.height - 18) : Math.max(c.edge, prev.edge + prev.height + 18);
+      }
+      if (up) node.style.bottom = `${H - c.edge}px`;
+      else node.style.top = `${c.edge}px`;
+      above = Math.min(above, up ? c.edge - c.height : c.edge);
+      below = Math.max(below, up ? c.edge : c.edge + c.height);
+      ties[n].setAttribute("y1", f(clusters[n].p.y + (up ? -1 : 1) * clusters[n].reach));
+      ties[n].setAttribute("y2", f(c.edge + (up ? 4 : -4)));
+    });
+    box.style.marginTop = `calc(clamp(12px, 2.6vh, 30px) + ${Math.ceil(-above)}px)`;
+    box.style.marginBottom = `${Math.ceil(below - H)}px`;
+    flowRiver(box.querySelector(".current"), { W, H, vw, left, cyAt, halfAt, glowAt });
+  }
+
   // The day as a river of stars running down the sky, morning at the top.
   // Every question asked is one small star at its hour, and the river glows
   // wider where the asking was thick. Beside the point where each thing
   // began sit the stars it yielded, one per thing worth keeping, in its
   // kind's colour: solid and glowing once kept, an outline while it waits, a
   // faint small one if it was let go.
-  function drawGalaxy(box, tasks, activity, dots, arriving, height) {
+  function drawGalaxyTall(box, tasks, activity, dots, arriving, height) {
     const W = Math.max(300, box.clientWidth);
     const narrow = W < 760;
     const cx = narrow ? 30 : W / 2;
@@ -712,14 +1062,14 @@
     spans.forEach((sp) => {
       const html = [];
       for (let n = 0; n < sp.count; n++) {
-        const r = 1.2 + rnd() * 1.4;
+        const r = 0.85 + rnd() * rnd() * 1.25; // mostly small, a few larger; always a little more than the dust
         for (let tries = 0; tries < 24; tries++) {
           const y = sp.ya + rnd() * (sp.yb - sp.ya);
           const side = rnd() * 2 - 1;
           const x = xAt(y) + Math.sign(side) * Math.pow(Math.abs(side), 0.85) * (sp.half + tries * 1.5);
           if (taken.some(([tx, ty, tr]) => Math.hypot(x - tx, y - ty) < r + tr + 1.4)) continue;
           taken.push([x, y, r]);
-          html.push(`<circle class="s${Math.floor(rnd() * 3)}${rnd() < 0.16 ? " tw" : ""}" cx="${f(x)}" cy="${f(y)}" r="${f(r)}"/>`);
+          html.push(speck(x, y, r, rnd));
           break;
         }
       }
@@ -763,7 +1113,7 @@
       <canvas class="current" aria-hidden="true"></canvas>
       <svg class="galaxy" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
         <defs>
-          <filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="${narrow ? 4 : 6}"/></filter>
+          <filter id="glow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="${narrow ? 4 : 6}"/></filter>${SPECK_LIGHT}
         </defs>
         <g class="specks" aria-hidden="true">${specks.map((g) => `<g class="ht-row">${g.html}</g>`).join("")}</g>
         <text class="ends" x="${f(xAt(top))}" y="12" aria-hidden="true">${esc(hhmmOf(t0))}</text>
@@ -773,7 +1123,7 @@
       </svg>
       ${cards.map((c) => c.html).join("")}`;
     // The river itself is painted under the stars, and moves.
-    flowRiver(box.querySelector(".current"), { W, H, top, narrow, xAt, spans });
+    flowRiverTall(box.querySelector(".current"), { W, H, top, narrow, xAt, spans });
     // Placed and timed through the CSSOM: the page's CSP forbids inline styles.
     // As the page arrives the stars come in from the top, as the day did.
     const delay = (y) => `${((y / H) * 1.1).toFixed(2)}s`;
@@ -791,13 +1141,180 @@
     });
   }
 
+  // A window-wide bed of light, rendered small once. Only the drifting dust
+  // and fourteen cloud sprites need painting again on each animation frame.
+  function flowRiver(canvas, river) {
+    const { W, H, vw, left, cyAt, halfAt, glowAt } = river;
+    const ext = 40;
+    const full = H + 2 * ext;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(full * dpr);
+    canvas.style.width = `${vw}px`;
+    canvas.style.height = `${full}px`;
+    canvas.style.left = `${(W - vw) / 2}px`;
+    canvas.style.top = `${-ext}px`;
+    let seed = 20261110;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(Math.PI * 2 * rnd());
+    const noise = (x, phase = 0) => Math.max(0, Math.min(1,
+      0.35 + 0.36 * Math.sin(x / 93 + phase) + 0.24 * Math.sin(x / 41 + 1.7 + phase) + 0.16 * Math.sin(x / 173 + 2.4)));
+    const fade = (u) => {
+      const k = Math.max(0, Math.min(1, u / (vw * 0.1), (vw - u) / (vw * 0.1)));
+      return k * k * (3 - 2 * k);
+    };
+    const TINTS = riverTints();
+    const tint = () => TINTS[Math.floor(rnd() * (TINTS.length - 1))];
+    const sprites = new Map();
+    for (const rgb of new Set(TINTS)) {
+      const sprite = document.createElement("canvas");
+      sprite.width = sprite.height = 128;
+      const sg = sprite.getContext("2d");
+      const light = sg.createRadialGradient(64, 64, 0, 64, 64, 64);
+      for (const [stop, alpha] of [[0, 1], [0.2, 0.78], [0.45, 0.36], [0.7, 0.1], [1, 0]]) light.addColorStop(stop, `rgba(${rgb},${alpha})`);
+      sg.fillStyle = light;
+      sg.beginPath();
+      sg.arc(64, 64, 64, 0, Math.PI * 2);
+      sg.fill();
+      sprites.set(rgb, sprite);
+    }
+    const puff = (g, x, y, radius, rgb, alpha, ry = radius) => {
+      g.globalAlpha = Math.min(1, alpha);
+      g.drawImage(sprites.get(rgb), x - radius, y - ry, radius * 2, ry * 2);
+    };
+    const SMALL = 0.5;
+    const STRONG = 2;
+    const still = document.createElement("canvas");
+    still.width = Math.ceil(vw * SMALL);
+    still.height = Math.ceil(full * SMALL);
+    const bed = still.getContext("2d");
+    bed.scale(SMALL, SMALL);
+    bed.globalCompositeOperation = "lighter";
+    // Back to front: a broad haze, scattered body, then a broken white core.
+    for (let u = 0; u <= vw; u += 18) {
+      const x = u + left;
+      const w = halfAt(x);
+      puff(bed, u, cyAt(x) + ext + gauss() * w * 0.35, 2.2 * w + 60, tint(), 0.014 * glowAt(x) * STRONG);
+    }
+    for (let u = 0; u <= vw; u += 9) {
+      const x = u + left;
+      const w = halfAt(x);
+      const b = glowAt(x) * STRONG;
+      for (let k = 0; k < 2; k++) {
+        // Where it runs wide the puffs are larger and lie deeper over one
+        // another, so each is fainter: otherwise the light piles up to a
+        // flat grey-white.
+        puff(bed, u + gauss() * 8, cyAt(x) + ext + gauss() * 0.5 * w, (0.6 + rnd() * 0.8) * w + 16, tint(), (0.032 + rnd() * 0.045) * b * Math.pow(46 / w, 1.25));
+      }
+    }
+    for (let u = 0; u <= vw; u += 9) {
+      const x = u + left;
+      const w = halfAt(x);
+      puff(bed, u, cyAt(x) + ext + gauss() * 0.1 * w, w * 0.3 + 10, TINTS[TINTS.length - 1], 0.055 * noise(x) * glowAt(x) * STRONG);
+    }
+    // Erase a little light in broken, meandering lanes. The sprites are
+    // stretched rather than drawing hard paths: these are dust, not outlines.
+    bed.globalCompositeOperation = "destination-out";
+    for (let u = 0; u <= vw; u += 8) {
+      const x = u + left;
+      const w = halfAt(x);
+      for (const [side, phase] of [[-0.22, 0.4], [0.3, 2.7]]) {
+        const strength = noise(x, phase);
+        if (strength < 0.18) continue;
+        const y = cyAt(x) + ext + side * w + Math.sin(x / 73 + phase) * w * 0.09 + Math.sin(x / 31 + phase) * 3;
+        puff(bed, u, y, 26 + rnd() * 8, TINTS[TINTS.length - 1], (0.035 + rnd() * 0.035) * strength, 9 + rnd() * 3);
+      }
+    }
+    bed.globalCompositeOperation = "source-over";
+    for (let n = 0; n < Math.round(vw * 0.95); n++) {
+      const u = rnd() * vw;
+      const x = u + left;
+      const y = cyAt(x) + ext + gauss() * 0.62 * halfAt(x);
+      const colour = rnd();
+      bed.fillStyle = colour < 0.85 ? "#eef2ff" : colour < 0.94 ? "#cfe0ff" : "#fff0d4";
+      bed.globalAlpha = Math.min(1, (0.15 + rnd() * 0.55) * STRONG);
+      bed.beginPath();
+      bed.arc(u, y, 0.3 + rnd() * 0.8, 0, Math.PI * 2);
+      bed.fill();
+    }
+    const clouds = Array.from({ length: 14 }, () => ({
+      u: rnd() * vw, side: gauss() * 0.42, size: 0.6 + rnd() * 0.8,
+      speed: 4 + rnd() * 6, alpha: 0.035 + rnd() * 0.035, rgb: tint(),
+    }));
+    const dust = Array.from({ length: 220 }, () => ({
+      u: rnd() * vw, side: gauss() * 0.62, speed: 6 + rnd() * 16,
+      size: 0.35 + rnd() * rnd() * 0.8, alpha: 0.15 + rnd() * 0.55,
+      phase: rnd() * Math.PI * 2, streak: rnd() < 0.08,
+    }));
+    const g = canvas.getContext("2d");
+    // Fade the complete image, including the outskirts of broad sprites,
+    // rather than only fading their centres and leaving a cut edge behind.
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const ends = g.createLinearGradient(0, 0, vw, 0);
+    for (const [stop, alpha] of [[0, 0], [0.1, 1], [0.9, 1], [1, 0]]) ends.addColorStop(stop, `rgba(255,255,255,${alpha})`);
+    function paint(t) {
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.globalCompositeOperation = "source-over";
+      g.globalAlpha = 1;
+      g.clearRect(0, 0, vw, full);
+      g.imageSmoothingQuality = "high";
+      g.globalAlpha = 1 / STRONG;
+      g.drawImage(still, 0, 0, vw, full);
+      g.globalCompositeOperation = "lighter";
+      for (const c of clouds) {
+        const u = (c.u + c.speed * t) % vw;
+        const x = u + left;
+        const w = halfAt(x);
+        puff(g, u, cyAt(x) + ext + c.side * w, (w * 1.1 + 20) * c.size, c.rgb, c.alpha * glowAt(x) * fade(u));
+      }
+      g.globalAlpha = 1;
+      g.lineCap = "round";
+      for (const d of dust) {
+        const u = (d.u + d.speed * t) % vw;
+        const x = u + left;
+        const y = cyAt(x) + ext + (d.side + 0.05 * Math.sin(t * 0.3 + d.phase)) * halfAt(x);
+        const alpha = d.alpha * fade(u) * (0.8 + 0.2 * Math.sin(t * 0.7 + d.phase));
+        if (d.streak) {
+          g.strokeStyle = `rgba(244,240,230,${(alpha * 0.34).toFixed(3)})`;
+          g.lineWidth = d.size * 1.2;
+          g.beginPath();
+          g.moveTo(u - d.speed * 0.32, y);
+          g.lineTo(u, y);
+          g.stroke();
+        }
+        g.fillStyle = `rgba(244,240,230,${alpha.toFixed(3)})`;
+        g.beginPath();
+        g.arc(u, y, d.size, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.globalCompositeOperation = "destination-in";
+      g.fillStyle = ends;
+      g.fillRect(0, 0, vw, full);
+    }
+    paint(0);
+    if (reducedMotion()) return;
+    let t = 0;
+    let last = performance.now();
+    const frame = (now) => {
+      if (!canvas.isConnected) return;
+      requestAnimationFrame(frame);
+      if (now - last < 30) return;
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (!el.rest.hidden) return;
+      t += dt;
+      paint(t);
+    };
+    requestAnimationFrame(frame);
+  }
+
   // The river of light the day's stars lie in, painted on a canvas so that
   // it can flow. It is a thread in the quiet hours and a broad reach where a
   // half hour was busy; its edges are cloud, not a line; and it comes in
   // from above the day and runs on past the end of it, fading at both. Dust
   // drifts down it all the while, morning to night, and slow clouds of
   // light with it. The stars that stand for questions stay where they are.
-  function flowRiver(canvas, river) {
+  function flowRiverTall(canvas, river) {
     const { W, H, top, narrow, xAt, spans } = river;
     const ext = 60; // how far past each end of the day it reaches
     const full = H + 2 * ext; // the canvas is this tall; its y is the day's y + ext
@@ -860,7 +1377,7 @@
     // size and strength is wanted. (Painting each as a faint gradient of its
     // own leaves the browser's dither showing through as a lattice once a
     // few hundred are laid over one another.)
-    const TINTS = ["142,156,255", "142,156,255", "168,150,255", "122,172,255", "222,162,236", "116,212,226", "198,208,255"];
+    const TINTS = riverTints();
     const tint = () => TINTS[Math.floor(rnd() * (TINTS.length - 1))];
     const sprites = new Map();
     for (const rgb of new Set(TINTS)) {
@@ -897,7 +1414,7 @@
       const b = at(glow, y) * fade(y) * STRONG;
       if (b < 0.02) continue;
       for (let k = 0; k < 2; k++) puff(bed, xAt(y) + gauss() * w * 0.5, y + ext + gauss() * 8, w * (0.62 + rnd() * 0.8) + 16, tint(), (0.035 + rnd() * 0.05) * b);
-      puff(bed, xAt(y) + gauss() * w * 0.14, y + ext, w * 0.4 + 9, "198,208,255", 0.07 * b);
+      puff(bed, xAt(y) + gauss() * w * 0.14, y + ext, w * 0.4 + 9, TINTS[TINTS.length - 1], 0.07 * b);
       // And a wide, very faint spread around it all, so it has no outline.
       if (!narrow) puff(bed, xAt(y) + gauss() * w * 0.7, y + ext + gauss() * 10, w * 1.7 + 46, tint(), 0.014 * b);
     }
@@ -944,14 +1461,14 @@
         const alpha = d.alpha * seen * (0.72 + 0.28 * Math.sin(t * 1.3 + d.phase));
         if (d.streak) {
           const back = y - d.speed * 0.32;
-          g.strokeStyle = `rgba(232,238,255,${(alpha * 0.34).toFixed(3)})`;
+          g.strokeStyle = `rgba(244,240,230,${(alpha * 0.34).toFixed(3)})`;
           g.lineWidth = d.size * 1.2;
           g.beginPath();
           g.moveTo(xAt(back) + sway * at(wide, back), back + ext);
           g.lineTo(x, yc);
           g.stroke();
         }
-        g.fillStyle = `rgba(232,238,255,${alpha.toFixed(3)})`;
+        g.fillStyle = `rgba(244,240,230,${alpha.toFixed(3)})`;
         g.beginPath();
         g.arc(x, yc, d.size, 0, Math.PI * 2);
         g.fill();
@@ -1017,7 +1534,7 @@
   // to a quiet sky and the time left; as it runs out, what the stretch
   // before it held comes up underneath, so going back starts from knowing
   // where everything stands.
-  const rest = { status: null, recap: null, asked: false, over: false, ticker: null, offset: 0, pop: false, line: 0 };
+  const rest = { status: null, recap: null, loading: false, error: false, retryAt: 0, atEnd: false, over: false, ticker: null, offset: 0, pop: false, line: 0 };
   let restTab = params.has("rest"); // a tab the host opened just for this rest
 
   const notifies = () => inBrowser && typeof Notification !== "undefined" && Notification.permission === "granted";
@@ -1028,15 +1545,18 @@
       applyRest(await api.rest({ visible: !document.hidden, notifies: notifies() }));
     } catch {
       // the host is away; the next asking will tell
+      tellRestWindow("close");
     }
   }
 
   function applyRest(s) {
     if (!s) return;
+    if (nativeRest && s.phase !== "resting") return tellRestWindow("close");
     const was = rest.status ? rest.status.phase : "idle";
+    const previousStart = rest.status && rest.status.startedAt;
     rest.status = s;
     rest.offset = Date.now() - s.now; // this page's clock against the host's
-    if (s.phase === "resting" && was !== "resting") enterRest();
+    if (s.phase === "resting" && (was !== "resting" || previousStart !== s.startedAt)) enterRest();
     else if (s.phase !== "resting" && was === "resting") leaveRest();
     renderRestButton();
     renderRestPop();
@@ -1053,12 +1573,16 @@
 
   function enterRest() {
     rest.recap = null;
-    rest.asked = false;
+    rest.loading = false;
+    rest.error = false;
+    rest.retryAt = 0;
+    rest.atEnd = false;
     rest.line = (rest.status.count || 0) % T.restLines.length;
     closeCal();
     closeRestPop();
     el.rest.hidden = false;
     renderRest();
+    tellRestWindow("ready");
     clearInterval(rest.ticker);
     rest.ticker = setInterval(tickRest, 1000);
     tickRest();
@@ -1077,6 +1601,7 @@
   }
 
   function leaveRest() {
+    tellRestWindow("close");
     clearInterval(rest.ticker);
     el.rest.hidden = true;
     el.rest.innerHTML = "";
@@ -1088,23 +1613,36 @@
     const left = restLeft();
     // The look back comes up as the rest runs out: in its last minute, or
     // its last third when it is a short one.
-    if (!rest.asked && left <= Math.min(60000, (s.endsAt - s.startedAt) / 3)) {
-      rest.asked = true;
-      loadRecap();
-    }
     const over = left <= 0;
+    if (!rest.loading && Date.now() >= rest.retryAt && (!rest.recap || (over && !rest.atEnd)) && left <= Math.min(60000, (s.endsAt - s.startedAt) / 3)) loadRecap();
     if (over !== rest.over) return void renderRest();
     const count = el.rest.querySelector(".rest-count");
     if (count) count.textContent = over ? "" : mmss(left);
   }
 
   async function loadRecap() {
+    if (rest.loading) return;
+    const startedAt = rest.status.startedAt;
+    const atEnd = restLeft() <= 0;
+    const current = () => rest.status && rest.status.phase === "resting" && rest.status.startedAt === startedAt;
+    rest.loading = true;
+    rest.error = false;
+    renderRest();
     try {
-      rest.recap = await api.restRecap();
+      const recap = await api.restRecap();
+      if (!current()) return;
+      if (!recap) throw new Error("recap unavailable");
+      rest.recap = recap;
+      rest.atEnd = atEnd;
     } catch {
-      rest.recap = null;
+      if (current()) rest.error = true;
+    } finally {
+      if (current()) {
+        rest.loading = false;
+        rest.retryAt = Date.now() + (rest.error ? 5000 : 0);
+        renderRest();
+      }
     }
-    if (rest.status && rest.status.phase === "resting") renderRest();
   }
 
   // What the stretch held, as a board: what waits on the person first, then
@@ -1145,7 +1683,7 @@
     const left = restLeft();
     const over = left <= 0;
     rest.over = over;
-    el.rest.classList.toggle("has-recap", Boolean(rest.recap));
+    el.rest.classList.toggle("has-recap", Boolean(rest.recap) || over);
     const foot = over
       ? `<button class="btn primary" type="button" data-rest="done">${esc(T.restBack)} <kbd>↵</kbd></button>`
       : `<button class="btn" type="button" data-rest="skip">${esc(T.restSkip)} <kbd>esc</kbd></button>
@@ -1158,6 +1696,7 @@
         <div class="rest-rule"></div>
         <p class="rest-count">${over ? "" : mmss(left)}</p>
         ${rest.recap ? recapHtml(rest.recap) : ""}
+        ${rest.error ? `<p class="recap-sum" role="status">${esc(T.recapFailed)} <button class="link" type="button" data-rest-retry>${esc(T.recapRetry)}</button></p>` : rest.loading && !rest.recap ? `<p class="recap-sum" role="status">${esc(T.recapLoading)}</p>` : ""}
         <div class="rest-foot">${foot}</div>
       </div>`;
     el.rest.querySelectorAll(".strip i").forEach((tick) => (tick.style.left = `${Math.min(1, Math.max(0, Number(tick.dataset.at))) * 100}%`));
@@ -1587,14 +2126,22 @@
     state.pick = key;
     state.focusId = null;
     state.tab = "today";
-    state.switching = true;
-    renderStatus();
+    // Reading another day can take seconds. The page says so in the middle
+    // of the screen straight away, with something moving, so that it is never
+    // taken for having frozen.
+    state.switching = key;
+    render();
     await refresh();
     state.switching = false;
-    renderStatus();
+    render();
   }
 
   const actions = {
+    growthToggle: () => {
+      growthExpandedDay = growthExpandedDay === state.view.day ? null : state.view.day;
+      renderOverview(state.view);
+      el.stage.querySelector(".growth-toggle")?.focus({ preventScroll: true });
+    },
     keep: () => decide("keep"),
     skip: () => decide("skip"),
     copy: copyDraft,
@@ -1611,6 +2158,10 @@
   };
 
   // -------------------------------------------------------------- events
+
+  el.stage.addEventListener("change", (e) => {
+    if (e.target.matches(".growth-check")) readGrowth(e.target);
+  });
 
   document.addEventListener("click", (e) => {
     const act = e.target.closest("[data-act]");
@@ -1668,6 +2219,7 @@
     }
   });
   el.rest.addEventListener("click", (e) => {
+    if (e.target.closest("[data-rest-retry]")) return void loadRecap();
     e.stopPropagation();
     const go = e.target.closest("[data-rest]");
     if (go) restAct(go.dataset.rest);
@@ -1697,7 +2249,7 @@
       return; // while the calendar is open, it has the keyboard
     }
     // A focused button handles its own Enter and Space.
-    const onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
+    const onButton = document.activeElement && ["BUTTON", "INPUT"].includes(document.activeElement.tagName);
     const deciding = state.tab === "open" && candidates().length > 0 && state.phase !== "distilling" && !state.error;
     switch (e.key) {
       case "Escape":
@@ -1825,6 +2377,7 @@
 
   // Each time the veil is lowered: replay the entrance and look again.
   function entered() {
+    if (nativeRest) return void pollRest();
     if (Date.now() - lastSeen > 30 * 60 * 1000) state.pick = undefined;
     lastSeen = Date.now();
     document.body.classList.remove("is-entering");
@@ -1846,13 +2399,30 @@
     else fitPhrases(el.stage.querySelector(".card-title"));
   });
 
+  // The river is painted in the sky's colours; when the system changes
+  // between light and dark it is painted again.
+  window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+    if (state.tab === "today") renderStage();
+  });
+
   // Asked now and then whether a rest is due; a tab in the background is
   // only let run about once a minute, which is often enough.
-  setInterval(pollRest, 15000);
+  setInterval(pollRest, nativeRest ? 1000 : 15000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) pollRest();
   });
 
+  if (nativeRest) {
+    // A reminder must not wait for a transcript scan or change the day the
+    // person's normal browser is looking at.
+    document.body.classList.add("native-rest");
+    api.meta().then((meta) => {
+      T = window.DotjarWords.copy(meta.language === "auto" ? navigator.language : meta.language, meta.wording);
+      document.documentElement.lang = T.lang;
+      pollRest();
+    }).catch(() => tellRestWindow("close"));
+    return;
+  }
   paintSky();
   render();
   if (host && !inBrowser) refresh(); // the desktop app announces each showing itself
