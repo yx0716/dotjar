@@ -330,6 +330,7 @@ function registerIpc() {
   handle("dotjar:today", (back) => session.today(back));
   handle("dotjar:distill", (days) => session.distill(days));
   handle("dotjar:calendar", (month) => session.calendar(month));
+  handle("dotjar:usage", (day) => session.usage(day));
   handle("dotjar:distilling", () => session.isDistilling());
   handle("dotjar:set-engine", (id) => session.setEngine(id));
   handle("dotjar:rest", () => session.rest.status());

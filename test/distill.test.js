@@ -3,6 +3,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+process.env.DOTJAR_HOME = require("fs").mkdtempSync(require("path").join(require("os").tmpdir(), "dotjar-distill-usage-"));
+
 const d = require("../src/core/distill");
 
 test("JSON is recovered from the shapes models actually return", () => {
@@ -40,7 +42,7 @@ test("candidates are validated, de-duplicated and capped", () => {
 
 test("both CLI output shapes are understood", () => {
   const result = { type: "result", is_error: false, result: '{"items":[]}', total_cost_usd: 0.01, duration_ms: 900, modelUsage: { "m-1": {} } };
-  const expected = { text: '{"items":[]}', costUsd: 0.01, durationMs: 900, model: "m-1" };
+  const expected = { text: '{"items":[]}', costUsd: 0.01, durationMs: 900, model: "m-1", usage: require("../src/core/usage").normalize("claude-cli", null, 0.01) };
   assert.deepEqual(d.parseCliOutput(JSON.stringify(result)), expected);
   assert.deepEqual(d.parseCliOutput(JSON.stringify([{ type: "system" }, { type: "assistant" }, result])), expected);
   assert.throws(() => d.parseCliOutput(JSON.stringify({ type: "result", is_error: true, result: "Not logged in" })), /Not logged in/);

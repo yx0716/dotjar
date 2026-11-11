@@ -38,6 +38,10 @@ npx github:yx0716/dotjar demo
 
 在本机读取 Claude Code、Codex、Cursor、Gemini CLI、Qwen Code、opencode、OpenClaw 等的对话记录，提取你说的话和 agent 每轮的收尾。捕捞时，这些摘要会交给你选择的模型服务：通过本机的 `claude`、`codex` 命令，或配置的 OpenAI 兼容接口。歇一歇的回顾只在本地读记录，不经过模型。
 
+## 捕捞消耗
+
+开发分支已加入逐次统计（尚未发布）：页面底部显示最近一次消耗，点击可查看所选日期的捕捞记录、模型、耗时和结果。Claude 显示参考费用，Codex 和 OpenAI 兼容接口显示返回的 token 用量；无法取得的显示「消耗暂不可获取」。参考费用不代表订阅额外扣费，也不换算成套餐百分比。失败和重试各自留记录，旧版本的历史消耗不补算。详见[统计口径与边界](docs/usage.md)。
+
 ## 版本更新
 
 从 v0.4.0 起支持签名更新包。托管安装从 GitHub 最新正式 Release 下载程序。
@@ -59,7 +63,7 @@ dotjar update install
 dotjar update status
 ```
 
-完整的安装、迁移、发布和恢复说明见 [安装与更新](docs/updates.md)。可选定时捕捞与逐次消耗展示仍在设计阶段，不包含在本次实现中。
+完整的安装、迁移、发布和恢复说明见 [安装与更新](docs/updates.md)。可选定时捕捞和账号剩余额度仍未实现。
 
 ## 配个桌宠
 

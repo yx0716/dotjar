@@ -141,6 +141,7 @@ function createSession(options = {}) {
     today,
     distill,
     rest,
+    usage: (day) => require("./runs").list(day || dayKey()),
     isDistilling: () => (progress ? { ...progress } : false),
     async calendar(month) {
       const now = new Date();

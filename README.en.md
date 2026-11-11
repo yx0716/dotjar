@@ -38,6 +38,10 @@ It can ask you to step away for a few minutes every so often. Off by default; yo
 
 Conversation records from Claude Code, Codex, Cursor, Gemini CLI, Qwen Code, opencode, OpenClaw and others are read locally. For a catch, excerpts containing your messages and each turn's closing reply are sent to your selected model service through the local `claude` or `codex` command, or a configured OpenAI-compatible endpoint. Break recaps read the local records without calling a model.
 
+## Catch usage
+
+The development branch now records individual runs (not yet released). Click the latest consumption in the footer to see runs for the selected material date, including model, duration and outcome. Claude provides an estimated cost; Codex and compatible endpoints provide token counts when available. Missing data is shown as unavailable. Estimates are not extra subscription charges or plan percentages. Failed runs and retries retain separate records; older runs are not reconstructed. See [accounting details](docs/usage.md) (Chinese).
+
 ## Updates
 
 Signed update packages are supported from v0.4.0. Managed installation downloads the latest stable GitHub Release.
@@ -59,7 +63,7 @@ dotjar update install
 dotjar update status
 ```
 
-See [installation, migration and publishing](docs/updates.md) (Chinese) for details. Scheduled catches and per-run consumption display remain design proposals and are not implemented in this release.
+See [installation, migration and publishing](docs/updates.md) (Chinese) for details. Scheduled catches and account quota display are not implemented.
 
 ## With a desktop pet
 
