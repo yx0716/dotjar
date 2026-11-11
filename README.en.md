@@ -40,13 +40,13 @@ Conversation records from Claude Code, Codex, Cursor, Gemini CLI, Qwen Code, ope
 
 ## Updates
 
-**This branch implements the updater; the first signed release has not been published yet.** Keep running from source until a GitHub Release includes the signed artifacts needed for managed installation.
+Signed update packages are supported from v0.4.0. Managed installation downloads the latest stable GitHub Release.
 
-Managed installation supports macOS with Node 20 or newer. After obtaining a version with the updater, stop the old service and run:
+Managed installation supports macOS with Node 20 or newer. Existing users should stop the old service first; new users can run this directly:
 
 ```bash
 # Use dotjar service uninstall for a login service, otherwise dotjar stop
-node bin/dotjar.js install-managed
+npx --yes github:yx0716/dotjar#v0.4.0 install-managed
 ```
 
 Add `~/.local/bin` to PATH and use its `dotjar` command from then on. Run `dotjar service install` again if you want login startup. Existing settings, ledgers and notes stay in place; source checkouts are never overwritten. Older versions without this command need a one-time manual upgrade first.
