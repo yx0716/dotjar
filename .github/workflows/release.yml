@@ -32,3 +32,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/release/* --verify-tag --title "$GITHUB_REF_NAME" --notes-file docs/release-notes.md
+  installers:
+    needs: release
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build double-click test installer from this release
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: node scripts/package-macos.js --arch="$BUILD_ARCH" --version="${GITHUB_REF_NAME#v}"
+      - name: Verify native-architecture bundled runtime
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: |
+          if [ "$(node -p process.arch)" = "$BUILD_ARCH" ]; then
+            node scripts/smoke-macos.js "dist/macos/$BUILD_ARCH/dotjar.app"
+          else
+            echo "Cross-compiled installer; native execution remains unverified on this runner."
+          fi
+      - name: Attach explicitly unnotarized test installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/macos/"$BUILD_ARCH"/*.pkg dist/macos/"$BUILD_ARCH"/*.sha256

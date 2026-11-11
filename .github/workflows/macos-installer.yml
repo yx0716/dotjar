@@ -5,7 +5,7 @@ on:
       release_version:
         description: Existing signed dotjar release to embed
         required: true
-        default: '0.4.1'
+        default: '0.4.2'
   pull_request:
     paths:
       - 'packaging/macos/**'
@@ -30,7 +30,7 @@ jobs:
       - run: npm test
       - name: Build unsigned test installer
         env:
-          RELEASE_VERSION: ${{ inputs.release_version || '0.4.1' }}
+          RELEASE_VERSION: ${{ inputs.release_version || '0.4.2' }}
           BUILD_ARCH: ${{ matrix.arch }}
         run: node scripts/package-macos.js --arch="$BUILD_ARCH" --version="$RELEASE_VERSION"
       - name: Test native-architecture bundled runtime

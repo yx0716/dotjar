@@ -40,11 +40,13 @@ npx github:yx0716/dotjar demo
 
 ## 捕捞消耗
 
-开发分支已加入逐次统计（尚未发布）：页面底部显示最近一次消耗，点击可查看所选日期的捕捞记录、模型、耗时和结果。Claude 显示参考费用，Codex 和 OpenAI 兼容接口显示返回的 token 用量；无法取得的显示「消耗暂不可获取」。参考费用不代表订阅额外扣费，也不换算成套餐百分比。失败和重试各自留记录，旧版本的历史消耗不补算。详见[统计口径与边界](docs/usage.md)。
+从 v0.4.2 起支持逐次统计：页面底部显示最近一次消耗，点击可查看所选日期的捕捞记录、模型、耗时和结果。Claude 显示参考费用，Codex 和 OpenAI 兼容接口显示返回的 token 用量；无法取得的显示「消耗暂不可获取」。参考费用不代表订阅额外扣费，也不换算成套餐百分比。失败和重试各自留记录，旧版本的历史消耗不补算。详见[统计口径与边界](docs/usage.md)。
 
 ## 版本更新
 
 macOS 双击安装包已提供测试构建：安装后在「应用程序」打开 dotjar，自带 Node.js，首次初始化无需联网下载程序。当前为**未公证测试版**，下载后可能需要在「系统设置 → 隐私与安全性」中手动允许打开；尚不作为免手动放行的正式分发。构建、测试及签名说明见 [macOS 安装包](docs/macos-installer.md)。
+
+下载 v0.4.2 测试安装包：[Apple 芯片](https://github.com/yx0716/dotjar/releases/download/v0.4.2/dotjar-0.4.2-macOS-arm64-unsigned-test.pkg) · [Intel](https://github.com/yx0716/dotjar/releases/download/v0.4.2/dotjar-0.4.2-macOS-x64-unsigned-test.pkg)。
 
 从 v0.4.0 起支持签名更新包。托管安装从 GitHub 最新正式 Release 下载程序。
 
@@ -52,7 +54,7 @@ macOS + Node 20 或更新版本可使用托管安装。已有用户先停止旧�
 
 ```bash
 # 登录自启的旧版先运行 dotjar service uninstall；普通后台服务用 dotjar stop
-npx --yes github:yx0716/dotjar#v0.4.1 install-managed
+npx --yes github:yx0716/dotjar#v0.4.2 install-managed
 ```
 
 把 `~/.local/bin` 加入 PATH，以后使用这里的 `dotjar`。需要登录自启时重新运行 `dotjar service install`。原配置、对话台账和笔记保留；源码工作区不会被覆盖。旧版本没有这个命令，需要先手动取得带更新器的版本。

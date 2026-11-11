@@ -1,6 +1,6 @@
 {
   "name": "dotjar",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "把今天和 AI agent 的对话看成一条银河：告诉你怎么把 agent 用得更好，捞起值得长期留下的策略、经验和盲点，隔一阵提醒你歇一歇、回看刚才做了什么。",
   "repository": "github:yx0716/dotjar",

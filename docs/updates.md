@@ -66,7 +66,7 @@ node scripts/release.js keygen
 
    也可以在仓库 Settings → Secrets and variables → Actions 中添加同名 Repository secret。私钥只能进入这个受控的 secret，不要粘贴到聊天、issue 或提交中。
 
-3. 确认发布版本未被使用，`package.json`、`package-lock.json` 的顶层版本及根包版本一致，并写好 `docs/release-notes.md`。在已合并且工作区干净的提交上创建并推送版本 tag；当前代码版本是 `0.4.1`，tag 必须和最终选定版本一致：
+3. 确认发布版本未被使用，`package.json`、`package-lock.json` 的顶层版本及根包版本一致，并写好 `docs/release-notes.md`。在已合并且工作区干净的提交上创建并推送版本 tag；当前代码版本是 `0.4.2`，tag 必须和最终选定版本一致：
 
    ```sh
    dotjarReleaseVersion=$(node -p 'require("./package.json").version')
@@ -82,7 +82,7 @@ node scripts/release.js keygen
 DOTJAR_SIGNING_KEY_FILE="$HOME/.dotjar-release/signing-key.pem" node scripts/release.js docs/release-notes.md
 ```
 
-产物在 `dist/release`：`dotjar-update.json` 和 `dotjar-<version>.json.gz`。GitHub 标签必须是 `v<version>`，附件必须挂在对应正式 Release；不从未发布的分支更新。`.github/workflows/release.yml` 只在推送 tag 时运行测试、构建和发布。普通开发与 PR 不发布。已经发布的版本号和附件保持不可变。
+产物在 `dist/release`：`dotjar-update.json` 和 `dotjar-<version>.json.gz`。GitHub 标签必须是 `v<version>`，附件必须挂在对应正式 Release；不从未发布的分支更新。`.github/workflows/release.yml` 只在推送 tag 时运行测试、构建和发布。普通开发与 PR 不发布。签名更新包发布后，同一流水线会构建并上传 arm64/x64 的双击安装包及 SHA-256 文件；当前安装包明确标为 `unsigned-test`，未完成 Apple 签名公证。已经发布的版本号和附件保持不可变。
 
 ## 验证边界
 
