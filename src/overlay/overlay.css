@@ -1,58 +1,112 @@
-/* The veil: frosted glass over whatever is on screen, light or dark with the
-   system. Each view does one thing: the day as a stream running down, then one
-   candidate at a time on a glass slab, then the list of what is kept.
-   The four kinds of thing worth keeping take four printing-ink colours. */
+/* A night sky. The day runs across it as a river of stars, one faint star for
+   every question asked; a pass over the day brings a few bright ones up, and
+   the ones worth having go into the jar. Each view does one thing: the day at
+   a glance, then one candidate at a time on a slab of dark glass, then the
+   list of what is kept. The sky follows the system. Set to dark it is
+   midnight. Set to light it is a slate-blue dusk with large soft fields of
+   colour in it: aqua, denim blue, rose and a little cream. */
+
+.native-rest > :not(#rest) { visibility: hidden; }
+
+/* Two faces travel with the page besides the system's own.
+   汇文明朝体, an old Ming face, sets the interface's own titles and the line
+   of verse. It carries only the characters those titles use (see
+   scripts/fonts.js for why); anything else falls through to the next face.
+   霞鹜文楷 sets what comes out of the day's work: card titles, the names of
+   things, the drafts. It carries the characters of GB2312; a rarer one is
+   drawn by the system. If the whole of it is installed, that is used. */
+@font-face {
+  font-family: "dotjar Ming";
+  src: url("fonts/huiwen-mincho-titles.woff") format("woff");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "dotjar Kai";
+  src: local("LXGW WenKai"), local("LXGWWenKai-Regular"), url("fonts/lxgw-wenkai-regular.woff") format("woff");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "dotjar Kai";
+  src: local("LXGW WenKai Medium"), local("LXGWWenKai-Medium"), url("fonts/lxgw-wenkai-medium.woff") format("woff");
+  font-weight: 500 700;
+  font-display: swap;
+}
 
 :root {
-  --veil: 244 246 250;
-  --veil-top: 0.46;
-  --veil-bottom: 0.74;
-  --ink: rgb(0 0 0 / 0.9);
-  --soft: rgb(0 0 0 / 0.6);
-  --faint: rgb(0 0 0 / 0.36);
-  --line: rgb(0 0 0 / 0.08);
-  --fill: rgb(0 0 0 / 0.055);
-  --fill-strong: rgb(0 0 0 / 0.1);
-  --glass: rgb(255 255 255 / 0.7);
-  --glass-edge: rgb(255 255 255 / 0.95);
-  --glass-shadow: 0 44px 100px -28px rgb(22 28 48 / 0.34), 0 2px 8px rgb(22 28 48 / 0.07);
-  --solid: #0c0d10;
-  --on-solid: #fff;
+  color-scheme: dark;
 
-  --note: #2f6bff;
-  --rule: #f0349a;
-  --skill: #00a878;
-  --memory: #f29d00;
+  /* midnight */
+  --sky-top: #04050e;
+  --sky-mid: #0a0e2b;
+  --sky-low: #160f35;
+  --veil: 6 7 22;
+  /* Clouds of colour in the sky: faint ones in the four corners. */
+  --washes:
+    radial-gradient(58% 48% at 10% 6%, rgb(96 74 224 / 0.26), transparent 72%), radial-gradient(46% 42% at 94% 16%, rgb(214 72 152 / 0.09), transparent 72%),
+    radial-gradient(56% 46% at 84% 100%, rgb(22 164 172 / 0.09), transparent 72%), radial-gradient(48% 40% at 6% 100%, rgb(122 84 224 / 0.1), transparent 72%);
+  /* What the river of stars is painted in ("r g b" each), and its bright middle. */
+  --river: 142 156 255, 142 156 255, 168 150 255, 122 172 255, 222 162 236, 116 212 226;
+  --river-core: 214 216 255;
+  --veil-top: 0.62;
+  --veil-bottom: 0.86;
+  --glass: rgb(17 19 46 / 0.7);
+
+  --ink: rgb(255 255 255 / 0.95);
+  --soft: rgb(228 232 255 / 0.7);
+  --faint: rgb(214 220 255 / 0.44);
+  --line: rgb(255 255 255 / 0.11);
+  --fill: rgb(255 255 255 / 0.075);
+  --fill-strong: rgb(255 255 255 / 0.15);
+  --glass-edge: rgb(255 255 255 / 0.15);
+  --glass-shadow: 0 44px 100px -28px rgb(0 0 0 / 0.75), 0 2px 8px rgb(0 0 0 / 0.35);
+  --solid: #fff;
+  --on-solid: #0b0d22;
+
+  /* The four kinds of star, and the colour of what an agent remembers. */
+  --craft: #f4d566;
+  --strategy: #79d6cc;
+  --lesson: #8ea8f0;
+  --trap: #f29a9c;
+  --memory: #b7a9e6;
+  --accent: var(--lesson);
 
   --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
   --round: ui-rounded, "SF Pro Rounded", var(--sans);
+  /* What is read, and the interface's own titles. */
+  --hand: "dotjar Kai", "Kaiti SC", "STKaiti", var(--sans);
+  --display: "dotjar Ming", var(--hand);
+  --star: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
 
   --gutter: clamp(24px, 4vw, 64px);
   --card-w: min(800px, 100vw - 2 * var(--gutter));
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
+  /* dusk: a deep slate-blue ground, and across the middle of it, where the
+     river runs, the colours of light held in glass: aqua to the left, denim
+     blue through the centre, rose to the right, each with a paler heart.
+     The fields are wide and low so that they lie along the river and read
+     as one band of light. Each is strong at its heart and only thins at its
+     edge, and the warm ones are kept vivid: laid on faintly, or greyed,
+     rose over blue goes to mud. */
   :root {
-    --veil: 9 10 13;
-    --veil-top: 0.5;
-    --veil-bottom: 0.78;
-    --ink: rgb(255 255 255 / 0.95);
-    --soft: rgb(255 255 255 / 0.62);
-    --faint: rgb(255 255 255 / 0.38);
-    --line: rgb(255 255 255 / 0.1);
-    --fill: rgb(255 255 255 / 0.075);
-    --fill-strong: rgb(255 255 255 / 0.14);
-    --glass: rgb(32 34 41 / 0.66);
-    --glass-edge: rgb(255 255 255 / 0.17);
-    --glass-shadow: 0 44px 100px -28px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.3);
-    --solid: #fff;
-    --on-solid: #0c0d10;
-
-    --note: #6b9bff;
-    --rule: #ff6db5;
-    --skill: #2fd6a3;
-    --memory: #ffc53d;
-    --aura: 0.34;
+    --sky-top: #1a2440;
+    --sky-mid: #202c4a;
+    --sky-low: #253453;
+    --veil: 27 37 62;
+    --soft: rgb(230 236 246 / 0.76);
+    --faint: rgb(212 222 238 / 0.5);
+    --washes:
+      radial-gradient(22% 14% at 11% 72%, rgb(150 222 220 / 0.32), transparent 70%), radial-gradient(20% 13% at 91% 62%, rgb(246 214 180 / 0.28), transparent 70%),
+      radial-gradient(46% 32% at 7% 74%, rgb(70 166 180 / 0.76), transparent 68%), radial-gradient(44% 30% at 95% 57%, rgb(208 124 146 / 0.56), transparent 68%),
+      radial-gradient(62% 34% at 46% 58%, rgb(58 98 160 / 0.78), transparent 70%);
+    --river: 120 160 224, 120 160 224, 128 208 212, 176 208 232, 232 170 182, 246 224 196;
+    --river-core: 250 240 220;
+    --veil-top: 0.66;
+    --veil-bottom: 0.86;
+    --glass: rgb(24 34 60 / 0.76);
   }
 }
 
@@ -82,14 +136,21 @@ body {
   cursor: default;
 }
 
-[data-kind="note"] {
-  --k: var(--note);
-}
+/* What an agent writes takes the colour of the nearest kind of star. */
+[data-kind="craft"],
 [data-kind="rule"] {
-  --k: var(--rule);
+  --k: var(--craft);
 }
+[data-kind="strategy"],
 [data-kind="skill"] {
-  --k: var(--skill);
+  --k: var(--strategy);
+}
+[data-kind="lesson"],
+[data-kind="note"] {
+  --k: var(--lesson);
+}
+[data-kind="trap"] {
+  --k: var(--trap);
 }
 [data-kind="memory"] {
   --k: var(--memory);
@@ -99,27 +160,33 @@ body {
   display: none !important;
 }
 
-/* ------------------------------------------------------------ the veil */
+/* ------------------------------------------------------------- the sky */
 
 .veil,
-.backdrop {
+.backdrop,
+.sky,
+.twinkles {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  pointer-events: none;
 }
 
+/* Over the desktop: the system blurs whatever is on screen, and this tints
+   it the colour of the night. */
 .veil {
+  z-index: -2;
   background: linear-gradient(to bottom, rgb(var(--veil) / var(--veil-top)), rgb(var(--veil) / var(--veil-bottom)));
 }
 
-/* Outside the desktop app there is no screen behind the window, so the demo
-   paints a stand-in desktop and blurs it the way the system would. */
 .backdrop {
   display: none;
+  z-index: -3;
 }
+
+/* A screenshot run of the desktop app has no screen behind the window, so it
+   paints a stand-in desktop and blurs it the way the system would. */
 .demo .backdrop {
   display: block;
-  z-index: -2;
   background:
     linear-gradient(#fdfdfd, #fdfdfd) 10% 24% / 36% 58% no-repeat,
     linear-gradient(#1d2029, #1d2029) 66% 38% / 46% 66% no-repeat,
@@ -129,23 +196,67 @@ body {
     radial-gradient(70% 70% at 55% 100%, #35c4a0, transparent 70%), #8b93a7;
 }
 .demo .veil {
-  backdrop-filter: blur(56px) saturate(1.5);
+  backdrop-filter: blur(56px) saturate(1.4);
 }
 
-/* In a browser tab the page is its own surface: no desktop to veil, so the
-   glass sits over soft fields of the four ink colours instead. */
+/* In a browser tab the page is its own surface, so the sky is painted in
+   full: deep at the top, a little warmth at the horizon, and a few clouds of
+   colour where the galaxy is thick. */
 .web .backdrop {
   display: block;
-  z-index: -2;
   background:
-    radial-gradient(42% 52% at 12% 18%, color-mix(in srgb, var(--note) 62%, transparent), transparent 72%),
-    radial-gradient(38% 46% at 88% 14%, color-mix(in srgb, var(--rule) 52%, transparent), transparent 72%),
-    radial-gradient(46% 50% at 78% 96%, color-mix(in srgb, var(--memory) 50%, transparent), transparent 72%),
-    radial-gradient(44% 48% at 18% 98%, color-mix(in srgb, var(--skill) 50%, transparent), transparent 72%),
-    rgb(var(--veil));
+    var(--washes),
+    linear-gradient(to bottom, var(--sky-top), var(--sky-mid) 56%, var(--sky-low));
 }
 .web .veil {
-  backdrop-filter: blur(70px) saturate(1.3);
+  display: none;
+}
+
+/* The far stars are painted once on a canvas; a handful of nearer ones are
+   elements of their own so that they can twinkle. */
+.sky {
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+.twinkles {
+  z-index: -1;
+}
+.twinkles i {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 7px 1px rgb(190 210 255 / 0.85);
+  animation: twinkle var(--d, 4s) ease-in-out var(--t, 0s) infinite;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* A four-pointed star wherever a kind is named in the page itself. */
+.dot,
+.pip,
+.fly,
+.key-star {
+  clip-path: var(--star);
+}
+
+.glyph {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  overflow: visible;
+  fill: currentColor;
 }
 
 /* -------------------------------------------------------------- top bar */
@@ -193,18 +304,21 @@ body {
   transform: translateY(1px) rotate(-135deg);
 }
 
-.cal {
+.cal,
+.pop {
   position: absolute;
   z-index: 10;
   top: calc(100% + 10px);
-  left: -14px;
-  width: 400px;
   padding: 16px 16px 14px;
   border-radius: 24px;
   background: var(--glass);
   box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-edge);
-  backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.5);
   animation: drop-in 0.16s ease-out;
+}
+.cal {
+  left: -14px;
+  width: 400px;
 }
 @keyframes drop-in {
   from {
@@ -308,7 +422,7 @@ body {
   text-overflow: ellipsis;
 }
 .cell-day small.is-open {
-  color: var(--note);
+  color: var(--craft);
   font-weight: 600;
 }
 .cell-day:hover:not(:disabled) {
@@ -319,7 +433,7 @@ body {
   color: var(--on-solid);
 }
 .cell.is-current {
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--note) 70%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .cell.is-future .cell-day {
   opacity: 0.35;
@@ -368,7 +482,8 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
-.cal-foot .btn {
+.cal-foot .btn,
+.pop .btn {
   padding: 8px 16px;
   font-size: 14px;
 }
@@ -404,14 +519,15 @@ button {
   font-size: 14.5px;
   font-weight: 500;
   color: var(--soft);
+  white-space: nowrap;
 }
 .tab b {
   font: 600 13.5px/1 var(--round);
   color: var(--faint);
 }
 .tab[aria-selected="true"] {
-  background: var(--glass);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), inset 0 0 0 1px var(--glass-edge);
+  background: var(--fill-strong);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
   color: var(--ink);
 }
 .tab[aria-selected="true"] b {
@@ -421,7 +537,8 @@ button {
 .tools {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 .tool {
   display: inline-flex;
@@ -434,10 +551,110 @@ button {
   font-size: 14.5px;
   font-weight: 500;
   color: var(--soft);
+  white-space: nowrap;
 }
-.tool:hover {
+.tool:hover,
+.tool[aria-expanded="true"] {
   background: var(--fill);
   color: var(--ink);
+}
+.tool small {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.tool.is-on small {
+  color: var(--strategy);
+}
+
+/* The jar: where what is kept goes, with a count of what it holds. */
+.ico {
+  flex: none;
+  width: 17px;
+  height: 18px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ico .in {
+  stroke: none;
+}
+.ico .s1 {
+  fill: var(--craft);
+}
+.ico .s2 {
+  fill: var(--lesson);
+}
+.ico .s3 {
+  fill: var(--trap);
+}
+.jar b {
+  font: 600 13.5px/1 var(--round);
+  color: var(--craft);
+}
+.jar b.is-bumped {
+  animation: bump 0.6s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+/* Timed rests: on or off, how often, how long. */
+.rest-tool {
+  position: relative;
+}
+.pop {
+  right: 0;
+  width: 320px;
+}
+.pop h3 {
+  margin: 0 0 12px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.pop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--soft);
+}
+.pop-row > span {
+  flex: none;
+  width: 3.2em;
+}
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--fill);
+}
+.seg button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--soft);
+  white-space: nowrap;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--solid);
+  color: var(--on-solid);
+}
+.pop-note {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+.pop-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 kbd {
@@ -453,9 +670,9 @@ kbd {
 :focus {
   outline: none;
 }
-/* A soft ring for keyboard focus; never a heavy black frame. */
+/* A soft ring for keyboard focus; never a heavy frame. */
 :focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--note) 60%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
   outline-offset: 2px;
 }
 
@@ -472,7 +689,8 @@ kbd {
   padding: clamp(14px, 3vh, 34px) var(--gutter) 0;
 }
 
-/* Light in the colour of the current card's kind, seen through the glass. */
+/* Light in the colour of the current card's kind: a cloud of the galaxy
+   seen through the glass. */
 .aura {
   position: absolute;
   left: 50%;
@@ -481,7 +699,7 @@ kbd {
   height: 62%;
   border-radius: 50%;
   background: var(--k, transparent);
-  opacity: var(--aura, 0.5);
+  opacity: 0.2;
   filter: blur(90px);
   transform: translate(-50%, -50%);
   transition: background-color 0.5s ease;
@@ -500,7 +718,21 @@ kbd {
   border-radius: 34px;
   background: var(--glass);
   box-shadow: var(--glass-shadow), inset 0 0 0 1px var(--glass-edge);
-  backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.5);
+}
+
+/* The edge of the glass catches the light in colours. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(126 226 182 / 0.75), rgb(140 160 244 / 0.5) 30%, rgb(242 168 190 / 0.6) 58%, rgb(246 228 126 / 0.7) 82%, rgb(126 226 182 / 0.6));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* The cards before and after this one, just visible at the edges. */
@@ -547,9 +779,8 @@ kbd {
 
 .dot {
   flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 13px;
+  height: 13px;
   background: var(--k);
 }
 
@@ -563,9 +794,12 @@ kbd {
 .kind {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  padding: 3px 12px 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--k) 16%, transparent);
   font-weight: 600;
-  color: var(--ink);
+  color: var(--k);
 }
 .carried {
   flex: none;
@@ -582,20 +816,19 @@ kbd {
   text-overflow: ellipsis;
 }
 
-/* One pip per candidate still waiting, coloured by kind. */
+/* One small star per candidate still waiting, coloured by kind. */
 .pips {
   display: flex;
   gap: 6px;
   margin-left: auto;
 }
 .pip {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
   background: var(--k);
-  opacity: 0.28;
+  opacity: 0.32;
   transition: transform 0.2s, opacity 0.2s;
 }
 .pip:hover {
@@ -617,7 +850,7 @@ kbd {
   border: 0;
   border-radius: 50%;
   background: var(--glass);
-  box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.3), inset 0 0 0 1px var(--glass-edge);
+  box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.5), inset 0 0 0 1px var(--glass-edge);
   transform: translateY(-50%);
   transition: transform 0.12s;
 }
@@ -731,10 +964,16 @@ kbd {
   padding: 0;
   background: none;
 }
+/* What to say next time, ready to be copied: set apart in the kind's colour. */
 .md blockquote {
-  padding-left: 14px;
-  border-left: 3px solid var(--line);
-  color: var(--soft);
+  padding: 10px 16px;
+  border-left: 3px solid var(--k, var(--line));
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--k, transparent) 9%, transparent);
+  color: var(--ink);
+}
+.md blockquote > :last-child {
+  margin-bottom: 0;
 }
 .md .table {
   margin: 0 0 0.9em;
@@ -774,6 +1013,8 @@ kbd {
   border-radius: 999px;
   background: var(--fill);
   font-weight: 500;
+  text-decoration: none;
+  color: inherit;
   transition: background 0.12s, transform 0.12s;
 }
 .btn:hover {
@@ -787,12 +1028,16 @@ kbd {
   color: var(--on-solid);
 }
 .btn.primary kbd {
-  background: rgb(127 127 127 / 0.32);
+  background: rgb(11 13 34 / 0.12);
   color: inherit;
 }
 .btn.primary:hover {
   background: var(--solid);
-  filter: brightness(1.25) contrast(0.92);
+  filter: brightness(0.92);
+}
+.btn .ico {
+  width: 16px;
+  height: 16px;
 }
 
 .dest {
@@ -834,6 +1079,9 @@ kbd {
 .lead-text:last-child {
   margin-bottom: 0;
 }
+.lead-text + .lead-text {
+  margin-top: -14px;
+}
 .lead-error {
   margin: 16px 0 24px;
   padding: 12px 16px;
@@ -842,45 +1090,115 @@ kbd {
   user-select: text;
 }
 
-/* While the model reads: four dots dropping in turn. */
-.settling {
+/* While records are being read: three stars taking turns to light up. */
+.reading {
   display: flex;
-  gap: 9px;
-  height: 34px;
-  align-items: flex-end;
+  align-items: center;
+  gap: 14px;
+  height: 30px;
+  margin-top: 4px;
 }
-.settling i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+.reading i {
+  width: 16px;
+  height: 16px;
   background: var(--k);
-  animation: drop 1.5s cubic-bezier(0.5, 0, 0.8, 0.4) infinite;
+  clip-path: var(--star);
+  animation: reading 1.4s ease-in-out infinite;
 }
-.settling i:nth-child(2) {
-  animation-delay: 0.16s;
+.reading i:nth-child(1) {
+  --k: var(--strategy);
 }
-.settling i:nth-child(3) {
-  animation-delay: 0.32s;
+.reading i:nth-child(2) {
+  --k: var(--craft);
+  animation-delay: 0.22s;
 }
-.settling i:nth-child(4) {
-  animation-delay: 0.48s;
+.reading i:nth-child(3) {
+  --k: var(--trap);
+  animation-delay: 0.44s;
 }
-@keyframes drop {
-  0% {
-    transform: translateY(-24px);
-    opacity: 0;
-  }
-  22% {
-    opacity: 1;
-  }
-  46%,
-  78% {
-    transform: translateY(0);
-    opacity: 1;
-  }
+@keyframes reading {
+  0%,
   100% {
-    transform: translateY(0);
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) rotate(45deg);
+  }
+}
+
+/* While the model reads: a net going back and forth through a stretch of
+   the river, and a star of each kind coming up out of it in turn. */
+.fishing {
+  margin-top: 6px;
+}
+.fishing svg {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  overflow: visible;
+}
+.f-dust circle {
+  fill: #fff;
+}
+.f-net {
+  animation: sweep 5.6s ease-in-out infinite alternate;
+}
+.f-pole,
+.f-hoop,
+.f-mesh {
+  fill: none;
+  stroke: var(--soft);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.f-mesh {
+  stroke-width: 0.8;
+  opacity: 0.7;
+}
+.f-star {
+  fill: var(--k);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rise 5.6s ease-out infinite;
+}
+.f-star:nth-child(2) {
+  animation-delay: 1.4s;
+}
+.f-star:nth-child(3) {
+  animation-delay: 2.8s;
+}
+.f-star:nth-child(4) {
+  animation-delay: 4.2s;
+}
+@keyframes sweep {
+  from {
+    transform: translate(34px, 52px);
+  }
+  to {
+    transform: translate(286px, 52px);
+  }
+}
+@keyframes rise {
+  0% {
     opacity: 0;
+    transform: translateY(10px) scale(0.3) rotate(-40deg);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-22px) scale(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(-36px) scale(0.8);
   }
 }
 
@@ -898,7 +1216,7 @@ kbd {
 }
 .row {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 13px minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 2px 14px;
   width: 100%;
@@ -913,7 +1231,18 @@ kbd {
 }
 .row .dot {
   align-self: start;
-  margin-top: 0.5em;
+  margin-top: 0.42em;
+}
+/* What an agent wrote down by itself is a small ring, not a star: the stars
+   are the ones the person took. */
+.row.by-agent .dot {
+  clip-path: none;
+  width: 9px;
+  height: 9px;
+  margin: 0.58em 2px 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: inset 0 0 0 1.6px var(--k);
 }
 .row-title {
   font-weight: 500;
@@ -938,7 +1267,7 @@ kbd {
   align-items: center;
   gap: 10px;
   min-height: 28px;
-  margin: clamp(10px, 1.8vh, 18px) var(--gutter) 0;
+  margin: clamp(10px, 1.8vh, 18px) var(--gutter) clamp(10px, 1.6vh, 16px);
   font-size: 13.5px;
   color: var(--soft);
   text-align: center;
@@ -951,130 +1280,351 @@ kbd {
   color: var(--ink);
   font-weight: 500;
 }
+.status .glyph {
+  color: var(--craft);
+}
 
-/* ----------------------------------------------------------- the stream */
+/* ------------------------------------------------------------ the river */
 
-/* The first view: the day as a stream running down the page, morning at the
-   top. Each thing worked on sits beside it where it happened in the day. Its
-   dot is solid at the core for the person's own calls and an open ring for
-   what an agent did; the two little tags under each use the same two fills. */
+/* The first view: a window-wide galaxy, morning on the left (running down
+   the sky in narrow windows). Every question asked is one faint star in it,
+   so the river is wide and bright where the day was busy. Beside the point where each thing
+   began sit the stars it yielded. */
 .overview {
-  width: min(1120px, 100%);
+  width: calc(100% + 2 * var(--gutter));
+  margin: 0 calc(-1 * var(--gutter));
+  overflow-x: hidden;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.overview::-webkit-scrollbar {
+  display: none;
+}
+.overview > :not(.flow) {
+  max-width: min(1120px, 100% - 2 * var(--gutter));
+  flex-shrink: 0;
+}
+/* Long wrapped labels scroll with the action, which must not cover them. */
+.overview:has(.flow.is-wide) .overview-foot {
+  position: relative;
+}
+.overview > .growth {
+  max-width: min(820px, 100% - 2 * var(--gutter));
+}
+/* A line of verse over the day, before it has been gone through. */
+.epigraph {
+  margin: 0 0 16px;
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-size: 15px;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  color: var(--soft);
+}
+:lang(en) .epigraph {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-indent: 0;
 }
 .overview-title {
   margin: 0;
-  font-size: clamp(30px, 3vw, 44px);
+  font-size: clamp(28px, 2.9vw, 42px);
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.015em;
 }
+
+/* One thing done well, one thing to try next time, and anything kept before
+   that was put to use today. */
+.growth {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  max-width: 820px;
+  margin-top: 14px;
+}
+.growth-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--soft);
+  text-align: left;
+}
+.growth-content {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.growth-content span { overflow-wrap: anywhere; }
+.growth-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 3px 0 0;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.025);
+  cursor: pointer;
+}
+.growth-check:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
+.growth-check:checked { background: var(--c); border-color: var(--c); }
+.growth-check:checked::after { content: "✓"; position: absolute; inset: -2px 0 0; text-align: center; color: var(--sky-top); font: 600 13px/17px var(--sans); }
+.growth-check:focus-visible { outline: 2px solid var(--c); outline-offset: 4px; }
+.growth-line.is-read .growth-content { opacity: .5; }
+.growth-toggle { align-self: center; margin-top: 2px; font-size: 12.5px; color: var(--faint); }
+.growth-burst { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+.growth-burst i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px 1px currentColor; }
+.growth-burst i:nth-child(3n) { width: 7px; height: 7px; border-radius: 0; clip-path: var(--star); }
+.growth-line b {
+  flex: none;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--c);
+}
+.growth-line.is-good {
+  --c: var(--craft);
+  color: var(--ink);
+}
+.growth-line.is-next {
+  --c: var(--strategy);
+}
+.growth-line.is-applied {
+  --c: var(--lesson);
+}
+button.growth-content:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .overview-key {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 4px 6px;
-  max-width: 46em;
-  margin: 14px 0 0;
-  color: var(--soft);
+  gap: 4px 18px;
+  max-width: 56em;
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  color: var(--faint);
 }
+.overview-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.overview-key .sep {
+  width: 1px;
+  height: 12px;
+  background: var(--line);
+}
+.key-star {
+  width: 11px;
+  height: 11px;
+  background: var(--k, var(--soft));
+}
+.key-open {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: var(--soft);
+  stroke-width: 1.5;
+  overflow: visible;
+}
+.key-open path {
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+.key-ask {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--soft);
+}
+
 .flow {
   position: relative;
-  width: 100%;
-  margin-top: clamp(18px, 4vh, 44px);
+  flex: none;
+  width: min(1120px, 100% - 2 * var(--gutter));
+  margin-top: clamp(12px, 2.6vh, 30px);
   text-align: left;
 }
-.stream {
+.galaxy {
   position: absolute;
   inset: 0;
   overflow: visible;
 }
-/* A stream of grey specks, one per question, and beside each task the
-   coloured dots it yielded. Overlapping dots mix like printing inks. */
-.specks {
-  fill: var(--ink);
+
+/* The river of light itself: painted on a canvas (see flowRiver), reaching a
+   little past both ends of the day. */
+.current {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
 }
+
+/* One small star per question. */
+/* Each is a point of light with its own glow (see speck()); only how bright
+   it is, is set here. */
 .specks .s0 {
-  opacity: 0.16;
+  opacity: 0.5;
 }
 .specks .s1 {
-  opacity: 0.24;
+  opacity: 0.74;
 }
 .specks .s2 {
-  opacity: 0.34;
+  opacity: 1;
 }
+.specks .glint {
+  fill: #fff;
+  opacity: 0.8;
+}
+.specks .tw {
+  animation: speck 3.4s ease-in-out infinite;
+}
+@keyframes speck {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .ends {
   font: 500 11.5px var(--round);
   fill: var(--faint);
   text-anchor: middle;
 }
+.flow.is-wide .ends.is-start {
+  text-anchor: end;
+}
+.flow.is-wide .ends.is-end {
+  text-anchor: start;
+}
 .tie {
   stroke: var(--line);
-  stroke-width: 1.5;
+  stroke-width: 1.2;
 }
-.dot {
-  fill: var(--k);
-  mix-blend-mode: multiply;
+/* The stars one thing yielded, joined up like a small constellation. */
+.constel {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.26);
+  stroke-width: 1;
+}
+
+/* A star brought up out of the river. Solid and glowing once it is in the
+   jar; an outline, slowly beckoning, while it waits to be looked at; a faint
+   small one if it was let go. */
+.star {
   cursor: pointer;
 }
-.dot.is-open {
-  fill: color-mix(in srgb, var(--k) 12%, transparent);
+.star .halo {
+  fill: var(--k);
+  opacity: 0.55;
+}
+.star .body {
+  fill: var(--k);
+}
+.star .core {
+  fill: #fff;
+  opacity: 0.9;
+}
+.star .hit {
+  fill: transparent;
+}
+.star .hoop {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 2 3.2;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.star .inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.16s;
+}
+.star:hover .inner {
+  transform: scale(1.14);
+}
+.star.is-open .body {
+  fill: color-mix(in srgb, var(--k) 20%, transparent);
   stroke: var(--k);
-  stroke-width: 2.6;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
-.dot.is-skipped {
-  opacity: 0.35;
+.star.is-open .core {
+  display: none;
+}
+.star.is-open .halo {
+  animation: beckon 3.2s ease-in-out infinite;
+}
+.star.is-open:hover .hoop {
+  opacity: 0.75;
+}
+.star.is-skipped {
   cursor: default;
+  opacity: 0.4;
 }
-.dot:hover {
-  filter: brightness(1.12);
+.star.is-skipped .halo,
+.star.is-skipped .core {
+  display: none;
 }
-@media (prefers-color-scheme: dark) {
-  .dot {
-    mix-blend-mode: screen;
+@keyframes beckon {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.6;
   }
 }
+/* A thing that left nothing to keep still marks its place. */
 .mark {
   fill: none;
   stroke: var(--faint);
-  stroke-width: 1.5;
+  stroke-width: 1.4;
 }
-.overview-key > span {
-  white-space: nowrap;
-}
-.overview-key > span + span {
-  margin-left: 12px;
-}
-.key-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 5px;
-  border-radius: 50%;
-  vertical-align: -1px;
-}
-.key-dot.is-kept {
-  background: var(--soft);
-}
-.key-dot.is-open {
-  box-shadow: inset 0 0 0 2px var(--soft);
-}
-.key-dot.is-ask {
-  width: 5px;
-  height: 5px;
-  margin-right: 5px;
-  background: var(--faint);
-  vertical-align: 1px;
-}
+
 .is-arriving .ht-row {
   animation: ink-in 0.7s ease-out both;
 }
+.is-arriving .current {
+  animation: ink-in 1.8s ease-out both;
+}
 .is-arriving .cluster {
-  animation: dot-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  animation: star-in 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both;
   transform-box: fill-box;
   transform-origin: center;
 }
@@ -1086,15 +1636,24 @@ kbd {
     opacity: 0;
   }
 }
-@keyframes dot-in {
+@keyframes star-in {
   from {
     opacity: 0;
-    transform: scale(0.3);
+    transform: scale(0.2) rotate(-60deg);
   }
 }
+
 .flow-item {
   position: absolute;
   width: var(--w, 300px);
+}
+.flow-item.is-up,
+.flow-item.is-down {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.flow.is-wide .flow-line > span {
+  min-width: 0;
 }
 .flow-item.is-left {
   text-align: right;
@@ -1143,11 +1702,22 @@ kbd {
 }
 .who.is-doubt {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--faint);
-  color: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--trap);
+  color: var(--trap);
 }
+/* The way on stays in reach when a short window makes the river scroll. */
 .overview-foot {
-  margin-top: clamp(22px, 5vh, 52px);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: clamp(8px, 2vh, 22px);
+  padding: 8px 0 4px;
 }
 .overview-foot .btn {
   padding: 11px 18px 11px 22px;
@@ -1158,21 +1728,294 @@ kbd {
 }
 @keyframes bump {
   from {
-    transform: scale(1.8);
+    transform: scale(1.9);
   }
 }
 
-/* The dot a kept candidate turns into, on its way up to the count. */
+/* The star a kept candidate turns into, on its way into the jar. */
 .fly {
   position: fixed;
   z-index: 5;
   left: 0;
   top: 0;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 16px;
+  height: 16px;
   background: var(--k);
   pointer-events: none;
+}
+
+/* ------------------------------------------------------------- the rest */
+
+/* Asked to step away: the whole page gives way to a quiet sky, a few words
+   and the time left. As the rest runs out, what the stretch before it held
+   comes up underneath. */
+.rest {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding: clamp(28px, 7vh, 80px) var(--gutter) clamp(20px, 4vh, 40px);
+  /* A few still stars of its own, since it covers the sky behind it. */
+  background:
+    radial-gradient(1.6px 1.6px at 9% 16%, rgb(255 255 255 / 0.8), transparent 100%),
+    radial-gradient(1.2px 1.2px at 22% 71%, rgb(255 255 255 / 0.55), transparent 100%),
+    radial-gradient(1.4px 1.4px at 31% 9%, rgb(190 210 255 / 0.7), transparent 100%),
+    radial-gradient(1.1px 1.1px at 43% 88%, rgb(255 255 255 / 0.5), transparent 100%),
+    radial-gradient(1.5px 1.5px at 58% 6%, rgb(255 255 255 / 0.6), transparent 100%),
+    radial-gradient(1.2px 1.2px at 69% 79%, rgb(255 226 190 / 0.7), transparent 100%),
+    radial-gradient(1.7px 1.7px at 81% 22%, rgb(255 255 255 / 0.85), transparent 100%),
+    radial-gradient(1.1px 1.1px at 93% 58%, rgb(190 210 255 / 0.6), transparent 100%),
+    radial-gradient(1.3px 1.3px at 5% 49%, rgb(255 255 255 / 0.5), transparent 100%),
+    radial-gradient(1.2px 1.2px at 88% 91%, rgb(255 255 255 / 0.55), transparent 100%),
+    radial-gradient(1.4px 1.4px at 15% 93%, rgb(190 210 255 / 0.6), transparent 100%),
+    radial-gradient(1.1px 1.1px at 74% 44%, rgb(255 255 255 / 0.4), transparent 100%),
+    linear-gradient(to bottom, rgb(var(--veil) / 0.97), rgb(var(--veil) / 0.93));
+  backdrop-filter: blur(26px);
+  overflow-y: auto;
+  animation: lower 0.5s ease-out;
+}
+.rest::before {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  width: min(70vw, 720px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(140 170 215 / 0.14), transparent);
+  transform: translate(-50%, -50%);
+  animation: breathe 9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.86);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
+}
+.rest-inner {
+  position: relative;
+  width: min(1120px, 100%);
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.rest-clock {
+  margin: 0;
+  font: 500 14px var(--round);
+  color: var(--faint);
+}
+.rest-head {
+  margin: clamp(18px, 6vh, 64px) 0 0;
+  font-size: clamp(32px, 4vw, 54px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.rest-line {
+  margin: 14px 0 0;
+  font-size: 17px;
+  color: var(--soft);
+}
+.rest-rule {
+  width: 86px;
+  height: 1px;
+  margin: clamp(18px, 4vh, 36px) 0 0;
+  background: var(--faint);
+}
+.rest-count {
+  margin: clamp(14px, 3vh, 28px) 0 0;
+  font: 500 clamp(34px, 4.4vw, 54px) / 1 var(--round);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--soft);
+}
+/* The way out stays in reach when the look back is taller than the window. */
+.rest-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: clamp(22px, 6vh, 64px);
+  padding: 22px 0 6px;
+  background: linear-gradient(to bottom, transparent, rgb(var(--veil) / 0.98) 18px);
+}
+.rest-foot .btn {
+  background: rgb(255 255 255 / 0.1);
+}
+.rest-foot .btn.primary {
+  background: var(--solid);
+}
+
+/* With the look back on screen, the words and the time left draw together
+   at the top and leave the room to it. */
+.rest.has-recap .rest-head {
+  margin-top: 12px;
+  font-size: clamp(24px, 2.6vw, 34px);
+}
+.rest.has-recap .rest-line,
+.rest.has-recap .rest-rule {
+  display: none;
+}
+.rest.has-recap .rest-count {
+  margin-top: 8px;
+  font-size: 22px;
+}
+.rest.has-recap .rest-foot {
+  margin-top: clamp(16px, 3vh, 30px);
+}
+
+.recap {
+  width: 100%;
+  margin-top: clamp(18px, 4vh, 40px);
+  animation: surface 0.7s ease-out both;
+}
+.recap-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+.recap-title span {
+  margin-left: 10px;
+  font: 500 13.5px var(--round);
+  color: var(--faint);
+}
+.recap-sum {
+  margin: 6px 0 0;
+  color: var(--soft);
+}
+.recap-sum b {
+  font-weight: 600;
+  color: var(--craft);
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  text-align: left;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 24px;
+  background: rgb(255 255 255 / 0.05);
+}
+[data-state="waiting"] {
+  --c: var(--craft);
+}
+[data-state="running"] {
+  --c: var(--strategy);
+}
+[data-state="done"] {
+  --c: var(--lesson);
+}
+.col h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 6px 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--soft);
+}
+.col h4 i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+}
+.col[data-state="running"] h4 i {
+  animation: speck 1.8s ease-in-out infinite;
+}
+.col h4 b {
+  margin-left: auto;
+  font: 600 13px var(--round);
+  color: var(--faint);
+}
+.col-none {
+  margin: 0 6px 4px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.thing {
+  padding: 12px 14px 10px;
+  border-radius: 16px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+}
+.thing-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.thing-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.thing p {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 7px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--soft);
+}
+/* Two lines each of what was asked and how it was left: a glance, not a read. */
+.thing p span {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* When in the stretch each question fell. */
+.strip {
+  position: relative;
+  height: 10px;
+  margin-top: 10px;
+}
+.strip::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4.5px;
+  height: 1px;
+  background: var(--line);
+}
+.strip i {
+  position: absolute;
+  top: 2px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--c);
+}
+.recap-ask {
+  margin: 18px 0 0;
+  font-size: 14.5px;
+  color: var(--faint);
 }
 
 /* --------------------------------------------------------------- motion */
@@ -1184,6 +2027,7 @@ kbd {
   animation: arrive 0.46s cubic-bezier(0.2, 0.9, 0.25, 1.1) backwards;
 }
 .is-entering .overview-title,
+.is-entering .growth,
 .is-entering .overview-key,
 .is-entering .overview-foot {
   animation: lower 0.5s ease-out backwards;
@@ -1216,7 +2060,7 @@ kbd {
 @keyframes kept {
   to {
     opacity: 0;
-    transform: translateY(46px) scale(0.9);
+    transform: translateY(-46px) scale(0.9);
   }
 }
 @keyframes skipped {
@@ -1234,11 +2078,24 @@ kbd {
   background: var(--fill-strong);
 }
 ::selection {
-  background: color-mix(in srgb, var(--note) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 36%, transparent);
 }
 
+@media (max-width: 1180px) {
+  .tool kbd {
+    display: none;
+  }
+}
 @media (max-width: 1100px) {
   .peek {
+    display: none;
+  }
+}
+@media (max-width: 860px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tool .lbl {
     display: none;
   }
 }
@@ -1256,6 +2113,9 @@ kbd {
   .card {
     border-radius: 26px;
   }
+  .pop {
+    right: -60px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1269,7 +2129,111 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .settling i {
+  .twinkles i,
+  .reading i,
+  .specks .tw,
+  .star.is-open .halo,
+  .f-net,
+  .f-star,
+  .rest::before,
+  .col[data-state="running"] h4 i {
     animation: none;
   }
+  .f-star {
+    opacity: 1;
+  }
 }
+
+/* ----------------------------------------------------------------- type */
+
+/* The interface's own titles, and the line of verse, in the Ming face. */
+.overview-title,
+.card.is-lead .card-title,
+.card.is-list .card-title,
+.rest-head,
+.recap-title,
+.epigraph {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.overview-title {
+  font-size: clamp(31px, 3.2vw, 46px);
+}
+.epigraph {
+  letter-spacing: 0.5em;
+}
+
+/* What the day's work turned up, in the hand: any character may be in it. */
+.card-title,
+.peek-title,
+.flow-title,
+.thing-title,
+.row-title,
+.md,
+.payoff,
+.lead-text,
+.growth-line span,
+.flow-line span,
+.rest-line,
+.thing p span {
+  font-family: var(--hand);
+}
+.card-title,
+.peek-title,
+.flow-title,
+.thing-title {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+/* The hand runs small beside the system's face, so where it is used the
+   sizes go up a step. */
+:lang(zh) .card:not(.is-lead):not(.is-list) .card-title {
+  font-size: clamp(29px, 2.7vw, 39px);
+}
+:lang(zh) .card:not(.is-lead):not(.is-list) .card-title.is-long {
+  font-size: clamp(25px, 2.25vw, 32px);
+}
+:lang(zh) .flow-title {
+  font-size: 17.5px;
+}
+:lang(zh) .md {
+  font-size: 16.5px;
+  line-height: 1.9;
+}
+/* The hand has no bold; what a draft marks out is marked in the kind's colour. */
+.md strong {
+  font-weight: 500;
+  color: var(--k, var(--ink));
+}
+:lang(zh) .growth-line span,
+:lang(zh) .flow-line span {
+  font-size: 14.5px;
+}
+
+/* In English there is nothing for the Chinese faces to do. */
+:lang(en) {
+  --hand: var(--sans);
+  --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+:lang(en) .epigraph {
+  letter-spacing: 0.02em;
+}
+
+/* A quiet entry; update details only occupy space when requested. */
+.update-dialog { width: min(480px, calc(100vw - 48px)); max-height: 80vh; overflow: auto; padding: 28px; border: 1px solid #ffffff30; border-radius: 22px; background: #202b43; color: #edf0f8; box-shadow: 0 20px 90px #0006; font: 15px/1.65 system-ui, sans-serif; }
+.update-dialog::backdrop { background: #090f2299; backdrop-filter: blur(5px); }
+.update-dialog h2 { font: 600 22px/1.4 system-ui, sans-serif; margin: 0 0 18px; }
+.update-dialog h3 { font-size: 17px; }
+.update-dialog p { margin: 12px 0; }
+.update-dialog code { user-select: all; font-size: 13px; }
+.update-muted { opacity: .65; font-size: 13px; }
+.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.update-error { color: #ffc2ae; overflow-wrap: anywhere; }
+.update-progress { color: #9cded6; }
+.update-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.update-action { border: 1px solid #ffffff35; background: #ffffff12; color: inherit; padding: 7px 12px; border-radius: 12px; cursor: pointer; font: inherit; }
+.update-action:disabled { opacity: .45; cursor: wait; }
+.update-action:focus-visible, .update-auto input:focus-visible { outline: 2px solid #9cded6; outline-offset: 3px; }
+.update-close { float: right; font-size: 13px; }
+.update-auto { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }

@@ -27,12 +27,13 @@ const DEFAULTS = Object.freeze({
   // Interface language: "zh", "en", or "auto" to follow the system.
   language: "auto",
   // What keeping something is called throughout the app (Chinese only). One of the sets in
-  // src/overlay/words.js, e.g. "落库", "落袋", "波点", "归仓".
-  wording: "落库",
+  // src/overlay/words.js, e.g. "打捞", "落库", "落袋", "归仓".
+  wording: "打捞",
   // Which engine goes through the day: "claude-cli" (a local `claude`),
   // "codex-cli" (a local `codex`), or "openai" (any OpenAI-compatible
-  // endpoint, configured under `api`). Also switchable from the interface.
-  engine: "claude-cli",
+  // endpoint, configured under `api`). "auto" takes the first of those this
+  // machine has. Also switchable from the interface.
+  engine: "auto",
   // For engine "codex-cli": model (empty = Codex's own default), how hard it
   // thinks, and where the CLI is if not on PATH.
   codexModel: "",
@@ -49,6 +50,10 @@ const DEFAULTS = Object.freeze({
   depositDir: "",
   // Extra folders whose .md files count as notes, besides any Obsidian vault.
   noteDirs: [],
+  // Asking the person to step away every `everyMin` minutes of work, for
+  // `forMin` minutes, with a look back at that stretch as the rest runs out.
+  // Off until switched on from the interface.
+  rest: { enabled: false, everyMin: 50, forMin: 5 },
   claudeDir: path.join(HOME, ".claude"),
   codexDir: path.join(HOME, ".codex"),
 });
@@ -70,7 +75,8 @@ function load() {
   }
   if (!Array.isArray(cfg.noteDirs)) cfg.noteDirs = [];
   cfg.api = { ...DEFAULTS.api, ...(cfg.api && typeof cfg.api === "object" ? cfg.api : {}) };
-  if (!["claude-cli", "codex-cli", "openai"].includes(cfg.engine)) cfg.engine = "claude-cli";
+  cfg.rest = { ...DEFAULTS.rest, ...(cfg.rest && typeof cfg.rest === "object" ? cfg.rest : {}) };
+  if (!["auto", "claude-cli", "codex-cli", "openai"].includes(cfg.engine)) cfg.engine = "auto";
   return cfg;
 }
 
@@ -157,3 +163,5 @@ module.exports = {
   tildify,
   writeJsonAtomic,
 };
+
+require("./operations").wrap(module.exports, ["save"]);

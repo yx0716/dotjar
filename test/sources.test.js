@@ -188,3 +188,56 @@ test("captured text joins the day's material, one piece per capture", () => {
     ["# 周会\n决定先做 A", "会议纪要.md"],
   ]);
 });
+
+test("a transcript says whether the agent is still at it or has ended the turn", async () => {
+  const dir = tmp();
+  const ask = (uuid, h, m, text) => ({ type: "user", uuid, timestamp: at(h, m), origin: { kind: "human" }, cwd: "/w/proj", message: { role: "user", content: text } });
+  const say = (uuid, h, m, stop, content) => ({ type: "assistant", uuid, timestamp: at(h, m), message: { model: "m", stop_reason: stop, content } });
+  const file = path.join(dir, ".claude", "projects", "p", "open.jsonl");
+  jsonl(file, [
+    ask("u1", 10, 0, "跑一下迁移"),
+    say("a1", 10, 1, "tool_use", [{ type: "text", text: "先看一眼表结构。" }]),
+    say("a2", 10, 1, "tool_use", [{ type: "tool_use", name: "Bash", input: {} }]),
+    say("a3", 10, 9, "end_turn", [{ type: "text", text: "迁移跑完了。" }]),
+    ask("u2", 10, 20, "再把回滚也试一遍"),
+    say("a4", 10, 21, "tool_use", [{ type: "text", text: "好，先备份。" }]),
+    say("a5", 10, 34, "tool_use", [{ type: "tool_use", name: "Bash", input: {} }]),
+  ]);
+  const s = await sources.readClaudeSession(file, win);
+  // The first turn ended; the second has said something but is still working.
+  assert.deepEqual(s.turns.map((t) => [t.reply, t.open]), [["迁移跑完了。", false], ["好，先备份。", true]]);
+  assert.equal(new Date(s.turns[1].activeTs).toISOString(), at(10, 34), "when it last showed a sign of life");
+
+  // Looked at from after the second ask: the work still going is there, under
+  // a turn with nothing asked in it, and the session is known to be a person's.
+  const later = { key: win.key, start: new Date(2026, 5, 10, 10, 30).getTime(), end: win.end };
+  const tail = await sources.readClaudeSession(file, later);
+  assert.deepEqual(tail.turns.map((t) => [t.user, t.reply, t.open]), [["", "", true]]);
+  assert.equal(tail.human, true);
+  // Going through a day only wants what was asked in it; the look back at a
+  // stretch of time also wants what an agent was still doing.
+  const gather = (extra) => sources.collectDay({ window: later, claudeDir: path.join(dir, ".claude"), codexDir: path.join(dir, "none"), home: dir, ...extra });
+  assert.equal((await gather()).sessions.length, 0);
+  assert.deepEqual((await gather({ carried: true })).sessions.map((x) => [x.human, x.turns.length]), [[true, 1]]);
+  // A run nobody asked for (another tool driving the CLI) is not carried over as anyone's work.
+  jsonl(path.join(dir, ".claude", "projects", "p", "timer.jsonl"), [
+    { type: "user", uuid: "x1", timestamp: at(10, 40), entrypoint: "sdk-cli", cwd: "/w/proj", message: { role: "user", content: "总结一下" } },
+    say("x2", 10, 41, "end_turn", [{ type: "text", text: "总结好了。" }]),
+  ]);
+  assert.equal((await gather({ carried: true })).sessions.length, 1);
+
+  // Codex says so with an event of its own.
+  const event = (h, m, payload) => ({ type: "event_msg", timestamp: at(h, m), payload });
+  const item = (type, text) => ({ type: "item_completed", item: { type, content: [{ text }] } });
+  const rollout = path.join(dir, "rollout-2026-06-10T10-00-00-11111111-2222-3333-4444-555555555555.jsonl");
+  jsonl(rollout, [
+    { type: "session_meta", payload: { cwd: "/w/proj" } },
+    event(11, 0, item("UserMessage", "改一下文案")),
+    event(11, 1, item("AgentMessage", "改好了一半。")),
+    event(11, 2, { type: "task_complete", last_agent_message: "文案改完了。" }),
+    event(11, 10, item("UserMessage", "再检查一遍")),
+    event(11, 11, item("AgentMessage", "正在检查。")),
+  ]);
+  const c = await sources.readCodexSession(rollout, win);
+  assert.deepEqual(c.turns.map((t) => [t.reply, t.open]), [["文案改完了。", false], ["正在检查。", true]]);
+});

@@ -20,10 +20,12 @@ const item = (kind, title, draft) => ({ id: itemId(kind, title), kind, title, pa
 
 test("a deposit reads back as title, kind, day, payoff and rendered body", () => {
   const stat = { mtimeMs: new Date(2026, 5, 12, 9).getTime() };
-  const text = ledger.renderDeposit(item("rule", "先写回滚语句", "写迁移前先给出回滚。\n\n**Why**：补得不从容"), "2026-06-10");
+  const text = ledger.renderDeposit(item("craft", "先写回滚语句", "写迁移前先给出回滚。\n\n**Why**：补得不从容"), "2026-06-10");
   const note = library.parseNote("/d/先写回滚语句.md", text, stat);
   assert.equal(note.title, "先写回滚语句");
-  assert.equal(note.kind, "rule");
+  assert.equal(note.kind, "craft");
+  // A note kept before the kinds were redrawn still reads back as what it was.
+  assert.equal(library.parseNote("/d/旧.md", "---\nkind: rule\n---\n# 旧\n正文", stat).kind, "rule");
   assert.equal(note.day, "2026-06-10");
   assert.equal(note.payoff, "再设计写接口时");
   assert.deepEqual(note.projects, ["a/b"]);
@@ -45,8 +47,8 @@ test("a note someone wrote by hand is still shelved", () => {
 test("the page gathers kept notes and what agents wrote, newest day first", () => {
   const home = freshHome();
   const cfg = config.load();
-  const a = item("note", "键由调用方生成", "**核心结论**：正文 <script>alert(1)</script>");
-  const b = item("skill", "排查 CI 失败的四步", "1. 第一步");
+  const a = item("lesson", "键由调用方生成", "**核心结论**：正文 <script>alert(1)</script>");
+  const b = item("strategy", "排查 CI 失败的四步", "1. 第一步");
   ledger.saveDay(ledger.snapshotSettled(ledger.applyDistilled(ledger.loadDay("2026-06-09"), [b]), [{ kind: "memory", name: "偏好", gists: ["提交说明写原因"], where: "repo", path: "/vault/偏好.md", ts: 1 }]));
   ledger.keep("2026-06-09", b.id, config.depositDir(cfg));
   ledger.saveDay(ledger.applyDistilled(ledger.loadDay("2026-06-10"), [a]));
@@ -62,7 +64,9 @@ test("the page gathers kept notes and what agents wrote, newest day first", () =
   const file = library.build(cfg, new Date(2026, 5, 10, 18, 5), "zh");
   assert.equal(file, path.join(home, "library.html"));
   const html = fs.readFileSync(file, "utf8");
-  assert.ok(html.includes("你落库了 2 篇，agent 另外写下 1 处。6月10日 18:05 更新。"));
+  assert.ok(html.includes("罐子里有你收下的 2 颗星，agent 另外写下 1 处。6月10日 18:05 更新。"));
+  // A filter only for the kinds there is something of.
+  assert.deepEqual([...html.matchAll(/class="chip" type="button" data-kind="(\w+)"/g)].map((m) => m[1]), ["strategy", "lesson", "memory"]);
   assert.ok(html.indexOf("键由调用方生成") < html.indexOf("排查 CI 失败的四步"));
   assert.ok(html.includes("agent 写进《偏好》"));
   assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
@@ -70,16 +74,51 @@ test("the page gathers kept notes and what agents wrote, newest day first", () =
   assert.ok(!/https?:\/\//.test(html), "one self-contained file: nothing is loaded from the network");
 });
 
+test("the library carries local fonts and builds without network assets", (t) => {
+  const previousHome = process.env.DOTJAR_HOME;
+  const home = freshHome();
+  t.after(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+    if (previousHome === undefined) delete process.env.DOTJAR_HOME;
+    else process.env.DOTJAR_HOME = previousHome;
+  });
+  const cfg = config.load();
+  const file = library.build(cfg, new Date(2026, 5, 10), "en");
+  const html = fs.readFileSync(file, "utf8");
+  assert.match(html, /@font-face\s*\{\s*font-family:\s*"dotjar Kai";/);
+  assert.doesNotMatch(html, /https?:\/\//);
+  const fontDir = path.join(home, "fonts");
+  const names = ["huiwen-mincho-titles.woff", "lxgw-wenkai-medium.woff", "lxgw-wenkai-regular.woff"];
+  assert.deepEqual(fs.readdirSync(fontDir).sort(), names);
+  for (const name of names) {
+    assert.ok(html.includes(`url("fonts/${name}")`));
+    assert.deepEqual(fs.readFileSync(path.join(fontDir, name)), fs.readFileSync(path.join(__dirname, "../src/overlay/fonts", name)));
+    fs.utimesSync(path.join(fontDir, name), 1, 1);
+  }
+  library.build(cfg);
+  for (const name of names) assert.equal(fs.statSync(path.join(fontDir, name)).mtimeMs, 1000, "unchanged fonts are not copied again");
+  // A new subset can have the same byte length as the previous one.
+  fs.writeFileSync(path.join(fontDir, names[0]), Buffer.alloc(fs.statSync(path.join(fontDir, names[0])).size));
+  library.build(cfg);
+  assert.deepEqual(fs.readFileSync(path.join(fontDir, names[0])), fs.readFileSync(path.join(__dirname, "../src/overlay/fonts", names[0])));
+  fs.rmSync(fontDir, { recursive: true });
+  fs.writeFileSync(fontDir, "blocks font copying");
+  assert.equal(library.build(cfg), file, "font copy failures do not prevent page generation");
+  assert.ok(fs.readFileSync(file, "utf8").startsWith("<!doctype html>"));
+});
+
 test("with nothing settled the page says how to start", () => {
   freshHome();
   const html = library.renderPage(library.collect(config.load(), "zh"), new Date(2026, 5, 10, 8, 0));
-  assert.ok(html.includes("库存还是空的。"));
-  assert.ok(html.includes("你落库了 0 篇"));
+  assert.ok(html.includes("罐子还是空的。"));
+  assert.ok(html.includes("罐子里有你收下的 0 颗星"));
+  const store = library.renderPage({ ...library.collect(config.load(), "zh"), wording: "落库" }, new Date(2026, 5, 10, 8, 0));
+  assert.ok(store.includes("<h1>库存</h1>") && store.includes("你落库了 0 篇"));
   const other = library.renderPage({ ...library.collect(config.load(), "zh"), wording: "攒" }, new Date(2026, 5, 10, 8, 0));
   assert.ok(other.includes("<h1>家底</h1>") && other.includes("你攒了 0 篇"), "the wording is one config value");
   const english = library.renderPage(library.collect(config.load(), "en"), new Date(2026, 5, 10, 8, 0));
-  assert.ok(english.includes('<html lang="en">') && english.includes("<h1>Library</h1>"));
-  assert.ok(english.includes("You kept 0 notes. Agents wrote in 0 other places. Updated Jun 10, 08:00."));
+  assert.ok(english.includes('<html lang="en">') && english.includes("<h1>Jar</h1>"));
+  assert.ok(english.includes("0 stars of yours in the jar. Agents wrote in 0 other places. Updated Jun 10, 08:00."));
   assert.ok(!/[\u4e00-\u9fff]/.test(english.replace(/<style>[\s\S]*?<\/style>/, "")), "an English page has no Chinese left in it");
 });
 

@@ -23,7 +23,7 @@ function dayFile(key) {
 }
 
 function emptyDay(key) {
-  return { day: key, distilledAt: null, model: null, costUsd: null, stats: null, items: [], settled: [], tasks: [] };
+  return { day: key, distilledAt: null, model: null, costUsd: null, stats: null, items: [], settled: [], tasks: [], growth: null };
 }
 
 function loadDay(key) {
@@ -62,7 +62,13 @@ function applyDistilled(day, items, meta = {}) {
     stats: meta.stats || day.stats,
     // An older reply without tasks leaves the last known ones in place.
     tasks: Array.isArray(meta.tasks) && meta.tasks.length ? meta.tasks : day.tasks || [],
+    // The same for what the day said about how the person is getting on.
+    growth: saysSomething(meta.growth) ? meta.growth : day.growth || null,
   };
+}
+
+function saysSomething(growth) {
+  return Boolean(growth && (growth.highlight || growth.next || (growth.applied && growth.applied.length)));
 }
 
 function snapshotSettled(day, settled) {
@@ -315,6 +321,35 @@ function history(limitDays = 30, uptoKey = null) {
   return out;
 }
 
+// What is in the jar: everything kept so far, how much of it in the seven
+// days ending at `key`, and on how many days something was kept. Counted by
+// the day a thing came from, so going through last week today does not make
+// today look busier than it was.
+function tally(key) {
+  const weekFrom = key ? keyDaysBefore(key, 6) : "";
+  let total = 0;
+  let week = 0;
+  let days = 0;
+  for (const k of listDayKeys()) {
+    if (key && k > key) continue;
+    const kept = loadDay(k).items.filter((i) => i.status === "kept").length;
+    if (!kept) continue;
+    total += kept;
+    days++;
+    if (k >= weekFrom) week += kept;
+  }
+  return { total, week, days };
+}
+
+// The note a kept title was written to, newest first; "" when it is gone.
+function fileOfKept(title) {
+  for (const key of listDayKeys().reverse()) {
+    const item = loadDay(key).items.find((i) => i.status === "kept" && i.title === title);
+    if (item) return item.file || "";
+  }
+  return "";
+}
+
 function recentTitles(limitDays = 14, uptoKey = null) {
   const keys = listDayKeys().filter((k) => !uptoKey || k <= uptoKey).slice(-limitDays);
   const kept = [];
@@ -346,6 +381,8 @@ module.exports = {
   listDayKeys,
   listDays,
   history,
+  tally,
+  fileOfKept,
   recentTitles,
   renderDeposit,
   fileNameFor,
@@ -355,3 +392,5 @@ module.exports = {
   hiddenPaths,
   setHidden,
 };
+
+require("./operations").wrap(module.exports, ["saveDay", "keep", "skip", "reopen", "markRemoved", "markRestored", "setHidden"]);

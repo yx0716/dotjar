@@ -15,20 +15,27 @@ test("JSON is recovered from the shapes models actually return", () => {
 test("candidates are validated, de-duplicated and capped", () => {
   const items = d.normalizeItems({
     items: [
-      { kind: "note", title: "  键由调用方生成  ", payoff: "设计写接口时", projects: ["a", "", "b"], task: " 重复扣款 ", draft: "正文" },
-      { kind: "NOTE", title: "键由调用方生成", draft: "重复" },
+      { kind: "lesson", title: "  键由调用方生成  ", payoff: "设计写接口时", projects: ["a", "", "b"], task: " 重复扣款 ", draft: "正文" },
+      { kind: "LESSON", title: "键由调用方生成", draft: "重复" },
       { kind: "memory", title: "不是候选的种类", draft: "x" },
-      { kind: "rule", title: "", draft: "没有标题" },
-      { kind: "skill", title: "没有正文", draft: "  " },
+      { kind: "trap", title: "", draft: "没有标题" },
+      { kind: "strategy", title: "没有正文", draft: "  " },
       null,
-      ...Array.from({ length: 12 }, (_, i) => ({ kind: "rule", title: `规则 ${i}`, draft: "x" })),
+      ...Array.from({ length: 12 }, (_, i) => ({ kind: "strategy", title: `打法 ${i}`, draft: "x" })),
     ],
   });
   assert.equal(items.length, 5);
-  assert.deepEqual(items[0], { id: d.itemId("note", "键由调用方生成"), kind: "note", title: "键由调用方生成", payoff: "设计写接口时", projects: ["a", "b"], task: "重复扣款", draft: "正文" });
+  assert.deepEqual(items[0], { id: d.itemId("lesson", "键由调用方生成"), kind: "lesson", title: "键由调用方生成", payoff: "设计写接口时", projects: ["a", "b"], task: "重复扣款", draft: "正文" });
   assert.equal(items[1].task, "");
   assert.equal(new Set(items.map((i) => i.id)).size, 5);
   assert.deepEqual(d.normalizeItems("nonsense"), []);
+
+  // The names from before the kinds were redrawn are read as the nearest of the four.
+  const old = d.normalizeItems({ items: [{ kind: "note", title: "甲", draft: "x" }, { kind: "rule", title: "乙", draft: "x" }, { kind: "skill", title: "丙", draft: "x" }] });
+  assert.deepEqual(old.map((i) => i.kind), ["lesson", "craft", "strategy"]);
+  // Advice on how to ask is capped, however much of it comes back.
+  const advice = d.normalizeItems({ items: [1, 2, 3, 4].map((n) => ({ kind: "craft", title: `用法 ${n}`, draft: "x" })).concat({ kind: "trap", title: "盲点", draft: "x" }) });
+  assert.deepEqual(advice.map((i) => i.title), ["用法 1", "用法 2", "盲点"]);
 });
 
 test("both CLI output shapes are understood", () => {
@@ -46,11 +53,13 @@ test("the prompt tells the model what is already settled and what was skipped", 
     digest: "## 项目：a/b\n材料正文",
     settled: [{ name: "网络", gists: ["滑动窗口"], excerpt: "滑动窗口决定平滑度" }],
     kept: ["先写回滚语句"],
+    pending: ["还在等他决定的"],
     skipped: ["一次性的修复"],
   });
   assert.ok(prompt.startsWith("[dotjar-distill]"));
-  assert.ok(prompt.includes("已写入《网络》：滑动窗口决定平滑度"));
-  assert.ok(prompt.includes("- 先写回滚语句"));
+  assert.ok(prompt.includes("- 《网络》：滑动窗口决定平滑度"));
+  assert.ok(prompt.includes("他已经留下的") && prompt.includes("- 先写回滚语句"));
+  assert.ok(prompt.includes("已经在候选里等他决定的，不要再提：\n- 还在等他决定的"));
   assert.ok(prompt.includes("- 一次性的修复"));
   assert.ok(prompt.includes("今天的材料（2026-06-10）"));
   assert.ok(prompt.trim().endsWith("材料正文"));
@@ -117,19 +126,84 @@ test("the prompt asks for plain writing, and for English when the interface is E
   const en = d.buildPrompt({ dayKey: "x", digest: "y", language: "en" });
   assert.ok(zh.includes("像他自己随手记笔记那样写"));
   assert.ok(zh.includes("所有字段都用他在材料里主要使用的语言写。"));
-  assert.ok(en.includes("所有字段都用英文写") && en.includes("Something odd / What's going on / Today, again"));
-  assert.ok(zh.includes("note（心得）"));
+  assert.ok(en.includes("所有字段都用英文写") && en.includes("What happened / Next time, say / Why it works / Make it stick"));
+  assert.ok(en.includes("What was missed / Why it's easy to miss / Ask this next time"));
 });
 
-test("the prompt asks for ways of thinking, not facts, and for what to doubt", () => {
+test("the prompt asks for four kinds of thing, each tied to a moment of the day", () => {
   const zh = d.buildPrompt({ dayKey: "x", digest: "y" });
-  assert.ok(zh.includes("他要留下的是思考方式"));
-  assert.ok(zh.includes("遇到现象时该往哪想、能看出一个答案对不对"));
-  assert.ok(zh.includes("**先看一件怪事**") && zh.includes("**想再往下挖**") && !zh.includes("易错"));
+  // How to work with the agent, then what the work itself taught.
+  for (const kind of ["craft（用法）", "strategy（策略）", "lesson（经验）", "trap（盲点）"]) assert.ok(zh.includes(kind), kind);
+  assert.deepEqual(d.CANDIDATE_KINDS, ["craft", "strategy", "lesson", "trap"]);
+  // Advice has to point at what happened; advice that fits any day is left out.
+  assert.ok(zh.includes("每一条都要指得出今天的哪一幕"));
+  assert.ok(zh.includes("放到哪天都成立的话也不算"));
+  // What to say next time comes ready to copy; a blind spot comes as a question to ask.
+  assert.ok(zh.includes("**下次这样说**") && zh.includes("**一劳永逸**") && zh.includes("**下次问这一句**"));
+  // Something nobody raised may be offered, marked as not yet checked.
+  assert.ok(zh.includes("今天的讨论里没人提") && zh.includes("还没验证"));
   assert.ok(zh.includes("命令参数、API 细节、语法"));
   assert.ok(zh.includes('"doubt":"…"'));
   const [task] = d.normalizeTasks({ tasks: [{ title: "缓存排查", effort: 3, human: "a", ai: "b", doubt: "  命中率  没压测 ", share: "mid" }] });
   assert.equal(task.doubt, "命中率 没压测");
+});
+
+test("the day also says how the person is getting on, without making anything up", () => {
+  const zh = d.buildPrompt({ dayKey: "x", digest: "y" });
+  assert.ok(zh.includes("写事，不写评价") && zh.includes("不要硬夸"));
+  assert.ok(zh.includes('"growth":{"highlight":"…","next":"…","applied":[{"title":"…","how":"…"}]}'));
+
+  const growth = d.normalizeGrowth(
+    {
+      growth: {
+        highlight: "  agent 说修好了，你追问了  怎么验证的 ",
+        next: "动手前先让 agent 复述范围",
+        applied: [
+          { title: "先写 回滚语句。", how: " 拦下了删列 " },
+          { title: "先写回滚语句", how: "重复的一条" },
+          { title: "清单里没有的", how: "编出来的" },
+          "nonsense",
+        ],
+      },
+    },
+    ["先写回滚语句", "另一条"]
+  );
+  assert.equal(growth.highlight, "agent 说修好了，你追问了 怎么验证的");
+  assert.equal(growth.next, "动手前先让 agent 复述范围");
+  // Only something he really kept counts as put to use, under its own title, once.
+  assert.deepEqual(growth.applied, [{ title: "先写回滚语句", how: "拦下了删列" }]);
+  assert.deepEqual(d.normalizeGrowth({}), { highlight: "", next: "", applied: [] });
+  assert.deepEqual(d.normalizeGrowth({ growth: "很棒" }), { highlight: "", next: "", applied: [] });
+});
+
+test("left to itself, the engine is whichever this machine has", () => {
+  const fs = require("fs");
+  const os = require("os");
+  const path = require("path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-engines-"));
+  const fake = path.join(dir, "codex");
+  fs.writeFileSync(fake, "#!/bin/sh\n", { mode: 0o755 });
+  const nowhere = path.join(dir, "missing");
+  const pathWas = process.env.PATH;
+  const homeWas = process.env.HOME;
+  // Nothing on PATH, and a home with none of the usual install folders.
+  process.env.PATH = dir + path.sep + "empty";
+  try {
+    const none = { engine: "auto", claudePath: nowhere, codexPath: nowhere, api: {} };
+    const available = (cfg) => d.engines(cfg).filter((e) => e.available).map((e) => e.id);
+    // Whatever this machine really has installed is found by its usual places; only what is configured can be controlled here.
+    if (!available(none).length) {
+      assert.equal(d.resolveEngine(none), "claude-cli", "with nothing to use, it stays on the one whose error says what to install");
+      assert.equal(d.resolveEngine({ ...none, codexPath: fake }), "codex-cli");
+      assert.equal(d.resolveEngine({ ...none, api: { baseUrl: "https://x/v1", model: "m" } }), "openai");
+    }
+    // A choice that was made is kept, available or not.
+    assert.equal(d.resolveEngine({ ...none, engine: "openai" }), "openai");
+    assert.equal(d.resolveEngine({ ...none, engine: "codex-cli" }), "codex-cli");
+  } finally {
+    process.env.PATH = pathWas;
+    process.env.HOME = homeWas;
+  }
 });
 
 test("Codex can go through the day in place of Claude", async () => {

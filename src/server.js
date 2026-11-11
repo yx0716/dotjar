@@ -12,6 +12,9 @@ const { spawn } = require("child_process");
 
 const config = require("./core/config");
 const { createSession } = require("./core/session");
+const { createRestWindow } = require("./rest-window");
+const updates = require("./update/manager");
+const operations = require("./core/operations");
 
 const DEFAULT_PORT = 4747;
 const COOKIE = "dotjar_token";
@@ -51,8 +54,13 @@ const STATIC = {
   "/overlay.js": ["overlay.js", "text/javascript; charset=utf-8"],
   "/markdown.js": ["markdown.js", "text/javascript; charset=utf-8"],
   "/words.js": ["words.js", "text/javascript; charset=utf-8"],
+  "/growth.js": ["growth.js", "text/javascript; charset=utf-8"],
+  "/updates.js": ["updates.js", "text/javascript; charset=utf-8"],
   "/demo-data.js": ["demo-data.js", "text/javascript; charset=utf-8"],
   "/web-bridge.js": ["web-bridge.js", "text/javascript; charset=utf-8"],
+  "/fonts/huiwen-mincho-titles.woff": ["fonts/huiwen-mincho-titles.woff", "font/woff"],
+  "/fonts/lxgw-wenkai-regular.woff": ["fonts/lxgw-wenkai-regular.woff", "font/woff"],
+  "/fonts/lxgw-wenkai-medium.woff": ["fonts/lxgw-wenkai-medium.woff", "font/woff"],
 };
 
 function tokenPath() {
@@ -116,8 +124,37 @@ function readBody(req) {
   });
 }
 
+// A page that asked about the rest within this long is taken to be open.
+// Generous, because a tab in the background is only let run once a minute.
+const PAGE_SEEN_FOR = 100 * 1000;
+
 function createApi(session, options = {}) {
+  const page = options.page || { seenAt: 0, visible: false, notifies: false };
+  const restAction = (name) => {
+    const status = session.rest[name]();
+    if (options.restChanged) options.restChanged(status, name === "start");
+    return status;
+  };
   return {
+    updateStatus: () => updates.status(),
+    updateCheck: () => updates.check(),
+    updatePreferences: (patch) => updates.preferences(patch),
+    updateInstall: (version) => updates.start(version),
+    updateReady: () => ({ ready: !session.isDistilling() && session.rest.status().phase === "idle" }),
+    updateHealth: () => {
+      const os = require("os");
+      const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-health-"));
+      try { fs.writeFileSync(path.join(scratch, "probe"), "ok", { flag: "wx" }); }
+      finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+      return { version: require("../package.json").version, root: process.env.DOTJAR_MANAGED_ROOT || null, dataDir: config.dataDir(), schema: 1 };
+    },
+    updateStop: (id) => {
+      const gate = operations.read(operations.gateFile());
+      if (!process.env.DOTJAR_MANAGED_ROOT || !gate || gate.id !== id || operations.active().length) throw new Error("更新尚未就绪");
+      if (!options.updateStop) throw new Error("此服务不支持更新切换");
+      setTimeout(options.updateStop, 100);
+      return true;
+    },
     meta: () => ({
       demo: false,
       web: true,
@@ -142,6 +179,20 @@ function createApi(session, options = {}) {
     reopen: (id) => session.reopen(id),
     capture: (text) => session.capture(text, "网页"),
     setDepositDir: (dir) => session.setDepositDir(dir),
+    // The page asks this every so often while it is open; the asking is also
+    // how the server knows a page is there to show a rest when one falls due.
+    rest: (beat) => {
+      page.seenAt = Date.now();
+      page.visible = Boolean(beat && beat.visible);
+      page.notifies = Boolean(beat && beat.notifies);
+      return session.rest.status();
+    },
+    restRecap: () => session.rest.recap(),
+    restStart: () => restAction("start"),
+    restSkip: () => restAction("skip"),
+    restSnooze: () => restAction("snooze"),
+    restDone: () => restAction("done"),
+    setRest: (patch) => session.rest.set(patch),
     removeFromLibrary: (file) => session.removeFromLibrary(file),
     restoreToLibrary: (undo) => session.restoreToLibrary(undo),
     restart: () => {
@@ -159,10 +210,34 @@ function createApi(session, options = {}) {
 }
 
 function createServer(options = {}) {
-  const session = options.session || createSession();
-  const token = options.token || loadToken();
+  // What is known of the page in the browser, for deciding who shows a rest.
+  const page = { seenAt: 0, visible: false, notifies: false };
   let httpServer = null;
-  const api = createApi(session, { restartable: options.restartable, restart: () => relaunch(httpServer) });
+  const restWindow = options.restWindow || createRestWindow();
+  const token = options.token || loadToken();
+  const onRestDue = (status) => {
+    const address = httpServer && httpServer.address();
+    if (!address) return;
+    const url = `http://127.0.0.1:${address.port}/?rest=1&t=${token}`;
+    restWindow.show(`${url}&nativeRest=1`, status, () => {
+      const open = Date.now() - page.seenAt < PAGE_SEEN_FOR;
+      // On macOS even a visible tab may be covered by another app.
+      if (process.platform !== "darwin" && open && (page.visible || page.notifies)) return;
+      (options.openInBrowser || openInBrowser)(url);
+    });
+  };
+  const session = options.session || createSession(options.watchRest ? { onRestDue } : {});
+  const api = createApi(session, { restartable: options.restartable, restart: () => relaunch(httpServer), page,
+    updateStop: () => {
+      restWindow.close();
+      httpServer.close(() => { require("./service").clearPid(); process.exit(0); });
+      httpServer.closeAllConnections();
+    },
+    restChanged: (status, start) => {
+      restWindow.sync(status);
+      if (start && options.watchRest) onRestDue(status);
+    },
+  });
 
   httpServer = http.createServer(async (req, res) => {
     try {
@@ -182,7 +257,7 @@ function createServer(options = {}) {
         });
       }
       if (!sameToken(cookieOf(req, COOKIE), token)) {
-        return send(res, 403, "text/html; charset=utf-8", "<!doctype html><meta charset=utf-8><title>dotjar</title><p style=\"font:16px system-ui;margin:3em\">这个页面要从 dotjar 打开：在终端运行 <code>npm run web</code>。<br>Open this page from dotjar: run <code>npm run web</code> in a terminal.</p>");
+        return send(res, 403, "text/html; charset=utf-8", "<!doctype html><meta charset=utf-8><title>dotjar</title><p style=\"font:16px system-ui;margin:3em\">这个页面要从 dotjar 打开：在终端再运行一次 dotjar，它会用带授权的地址打开这一页。<br>Open this page from dotjar: run dotjar again in a terminal and it opens this page with its token.</p>");
       }
 
       if (req.method === "GET" || req.method === "HEAD") {
@@ -193,7 +268,8 @@ function createServer(options = {}) {
         if (url.pathname === "/library") return send(res, 200, "text/html; charset=utf-8", fs.readFileSync(session.library()));
         if (url.pathname === "/icon.png") return send(res, 200, "image/png", fs.readFileSync(path.join(__dirname, "..", "assets", "icon.png")));
         const hit = STATIC[url.pathname];
-        if (hit) return send(res, 200, hit[1], fs.readFileSync(path.join(OVERLAY, hit[0])));
+        // A font is megabytes and does not change between one look and the next: the browser may keep it for a day.
+        if (hit) return send(res, 200, hit[1], fs.readFileSync(path.join(OVERLAY, hit[0])), hit[1] === "font/woff" ? { "cache-control": "private, max-age=86400" } : {});
         return send(res, 404, "text/plain; charset=utf-8", "not found");
       }
 
@@ -223,6 +299,21 @@ function createServer(options = {}) {
       else res.end();
     }
   });
+  if (options.watchRest) {
+    const stopUpdates = updates.watch();
+    httpServer.once("close", stopUpdates);
+  }
+  // The server that stays running keeps the time between rests.
+  if (options.watchRest && session.rest) httpServer.once("listening", () => {
+    const shutdown = () => restWindow.close();
+    process.on("exit", shutdown);
+    const timer = setInterval(() => session.rest.tick().catch(() => {}), 30 * 1000);
+    const guard = setInterval(() => restWindow.sync(session.rest.status()), 1000);
+    timer.unref();
+    guard.unref();
+    httpServer.on("close", () => { clearInterval(timer); clearInterval(guard); process.removeListener("exit", shutdown); });
+  });
+  httpServer.on("close", () => restWindow.close());
   return httpServer;
 }
 
@@ -283,12 +374,12 @@ async function start(options = {}) {
   // Port 0 asks the system for any free port (used by the tests).
   const wanted = options.port === 0 ? 0 : Number(options.port) || DEFAULT_PORT;
   for (let port = wanted; port < wanted + 10; port++) {
-    const server = createServer({ token, restartable: options.restartable });
+    const server = createServer({ token, restartable: options.restartable, watchRest: options.watchRest });
     try {
       const bound = await listen(server, port);
       return { server, port: bound, url: `http://127.0.0.1:${bound}/?t=${token}`, reused: false };
     } catch (err) {
-      if (err.code !== "EADDRINUSE") throw err;
+      if (err.code !== "EADDRINUSE" || process.env.DOTJAR_MANAGED_ROOT) throw err;
       if (await isOurs(port, token)) return { server: null, port, url: `http://127.0.0.1:${port}/?t=${token}`, reused: true };
     }
   }

@@ -145,6 +145,9 @@ async function readClaudeSession(file, win, seen = new Set(), agent = "claude-co
       return;
     }
     const ts = Date.parse(rec.timestamp);
+    // A person asked something in this session, whenever that was: work an
+    // agent is still doing on an earlier ask is theirs, not a timer's.
+    if (!session.human && rec.type === "user" && claudeHumanText(rec)) session.human = true;
     if (!inWindow(ts, win)) return;
     // A resumed session starts as a copy of the one it continues.
     if (rec.uuid) {
@@ -161,6 +164,17 @@ async function readClaudeSession(file, win, seen = new Set(), agent = "claude-co
     }
     if (rec.type !== "assistant" || rec.isSidechain || !rec.message) return;
     if (rec.message.model === "<synthetic>") return;
+    // Whether the agent is still at it: a message that stops to call a tool
+    // has more coming, one that ends the turn does not.
+    let current = session.turns[session.turns.length - 1];
+    if (!current) {
+      // The ask was before the window opened; the work on it is in it.
+      current = { ts, user: "", reply: "" };
+      session.turns.push(current);
+    }
+    current.activeTs = ts;
+    const stop = rec.message.stop_reason;
+    if (stop) current.open = stop === "tool_use" || stop === "pause_turn";
     const blocks = Array.isArray(rec.message.content) ? rec.message.content : [];
     for (const b of blocks) {
       if (!b) continue;
@@ -244,10 +258,13 @@ async function readCodexSession(file, win) {
     }
     if (rec.type !== "event_msg") return;
     const ts = Date.parse(rec.timestamp);
+    if (!session.human && p.type === "item_completed" && p.item && p.item.type === "UserMessage" && cleanHumanText(codexText(p.item))) session.human = true;
     if (!inWindow(ts, win)) return;
 
     if (p.type === "task_complete") {
       if (p.last_agent_message) setReply(session, ts, String(p.last_agent_message).trim());
+      const finished = session.turns[session.turns.length - 1];
+      if (finished) finished.open = false;
       return;
     }
     if (p.type !== "item_completed" || !p.item) return;
@@ -258,7 +275,10 @@ async function readCodexSession(file, win) {
     } else if (item.type === "AgentMessage") {
       // Provisional: overwritten by task_complete when the turn finishes.
       const text = codexText(item).trim();
-      if (text) setReply(session, ts, text);
+      if (text) {
+        setReply(session, ts, text);
+        session.turns[session.turns.length - 1].open = true; // said something, not yet done
+      }
     } else if (item.type === "FileChange" && item.changes && typeof item.changes === "object") {
       for (const [filePath, change] of Object.entries(item.changes)) {
         const kind = change && change.type;
@@ -527,7 +547,9 @@ async function collectDay(options) {
       if (excludeCwds.some((dir) => session.cwd === dir || session.cwd.startsWith(dir + path.sep))) continue;
       finalize(session, home);
       touched.push(...session.touched);
-      const asked = session.turns.some((t) => t.user || t.note);
+      // `carried` also keeps a person's session whose only sign of life in
+      // the window is an agent still working on, or answering, an earlier ask.
+      const asked = session.turns.some((t) => t.user || t.note) || Boolean(options.carried && session.human && session.turns.length);
       if (!asked || isAutomation(session)) continue;
       sessions.push(session);
     }

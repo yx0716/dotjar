@@ -79,6 +79,12 @@ test("the browser interface is only reachable with the token, from this machine"
   assert.equal((await request(port, { path: "/overlay.css", headers: { cookie } })).status, 200);
   assert.equal((await request(port, { path: "/library", headers: { cookie } })).body, "<h1>库存</h1>");
 
+  // The fonts the page carries are served like its other files, and may be kept for a day.
+  const font = await request(port, { path: "/fonts/huiwen-mincho-titles.woff", headers: { cookie } });
+  assert.deepEqual([font.status, font.headers["content-type"], font.headers["cache-control"]], [200, "font/woff", "private, max-age=86400"]);
+  assert.equal((await request(port, { path: "/fonts/huiwen-mincho-titles.woff" })).status, 403);
+  assert.equal((await request(port, { path: "/fonts/README.md", headers: { cookie } })).status, 404);
+
   // Only the listed files exist; there is no path to anything else on disk.
   for (const p of ["/main.js", "/../package.json", "/%2e%2e/package.json", "/overlay/overlay.js", "/core/config.js"]) {
     assert.equal((await request(port, { path: p, headers: { cookie } })).status, 404, p);
@@ -147,4 +153,70 @@ test("a desktop companion can ask for a pulse without rescanning", async (t) => 
   const body = JSON.parse(res.body);
   assert.equal(body.ok, true);
   assert.equal(body.value.open, 1);
+});
+
+test("the page can ask about the rest, take one, and change how often", async (t) => {
+  const os = require("os");
+  process.env.DOTJAR_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-web-rest-"));
+  const { createSession } = require("../src/core/session");
+  // A real session, so the calls go all the way through; nobody is ever away.
+  const session = createSession({ language: "zh", idle: () => 0 });
+  const token = "d".repeat(48);
+  const srv = server.createServer({ session, token });
+  const port = await server.listen(srv, 0);
+  t.after(() => srv.close());
+  const post = async (name, ...args) =>
+    JSON.parse((await request(port, { method: "POST", path: `/api/${name}`, headers: { cookie: `${server.COOKIE}=${token}`, "content-type": "application/json", "x-dotjar": "1" } }, JSON.stringify({ args }))).body).value;
+
+  // Off until someone turns it on.
+  const off = await post("rest", { visible: true, notifies: false });
+  assert.deepEqual([off.enabled, off.phase, off.everyMin, off.forMin], [false, "idle", 50, 5]);
+  assert.deepEqual(off.choices, { every: [25, 50, 90], for: [3, 5, 10] });
+
+  const on = await post("setRest", { enabled: true, everyMin: 25 });
+  assert.deepEqual([on.enabled, on.everyMin, on.dueAt > on.now], [true, 25, true]);
+  assert.deepEqual(require("../src/core/config").load().rest, { enabled: true, everyMin: 25, forMin: 5 }, "kept across restarts");
+
+  // Taken by hand, looked back on, and ended.
+  assert.equal((await post("restStart")).phase, "resting");
+  const recap = await post("restRecap");
+  assert.ok(Array.isArray(recap.things) && recap.minutes >= 1);
+  const done = await post("restDone");
+  assert.deepEqual([done.phase, done.count], ["idle", 1]);
+  assert.equal(await post("restRecap"), null);
+});
+
+test("manual rests open an authenticated native surface even with a visible browser; skip and shutdown close it", async (t) => {
+  let status = { phase: "idle" };
+  const shown = [];
+  const synced = [];
+  let closed = 0;
+  const session = { ...fakeSession(), rest: {
+    status: () => status,
+    tick: async () => status,
+    start: () => (status = { phase: "resting", startedAt: Date.now(), endsAt: Date.now() + 60000 }),
+    skip: () => (status = { phase: "idle" }),
+  } };
+  const token = "e".repeat(48);
+  const srv = server.createServer({ session, token, watchRest: true, restWindow: {
+    show: (...args) => shown.push(args), sync: (s) => synced.push(s), close: () => closed++,
+  } });
+  const port = await server.listen(srv, 0);
+  t.after(() => srv.close());
+  const post = (name, args = []) => request(port, { method: "POST", path: `/api/${name}`, headers: {
+    cookie: `${server.COOKIE}=${token}`, "content-type": "application/json", "x-dotjar": "1",
+  } }, JSON.stringify({ args }));
+  await post("rest", [{ visible: true, notifies: true }]);
+  await post("restStart");
+  assert.equal(shown.length, 1);
+  const url = new URL(shown[0][0]);
+  assert.equal(url.searchParams.get("t"), token);
+  assert.equal(url.searchParams.get("nativeRest"), "1");
+  const auth = await request(port, { path: url.pathname + url.search });
+  assert.equal(auth.status, 302);
+  assert.equal(auth.headers.location, "/?rest=1&nativeRest=1");
+  await post("restSkip");
+  assert.equal(synced.at(-1).phase, "idle");
+  await new Promise((resolve) => srv.close(resolve));
+  assert.equal(closed, 1);
 });
