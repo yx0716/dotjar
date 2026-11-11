@@ -46,7 +46,7 @@ macOS + Node 20 或更新版本可使用托管安装。已有用户先停止旧�
 
 ```bash
 # 登录自启的旧版先运行 dotjar service uninstall；普通后台服务用 dotjar stop
-npx --yes github:yx0716/dotjar#v0.4.0 install-managed
+npx --yes github:yx0716/dotjar#v0.4.1 install-managed
 ```
 
 把 `~/.local/bin` 加入 PATH，以后使用这里的 `dotjar`。需要登录自启时重新运行 `dotjar service install`。原配置、对话台账和笔记保留；源码工作区不会被覆盖。旧版本没有这个命令，需要先手动取得带更新器的版本。

@@ -46,7 +46,7 @@ Managed installation supports macOS with Node 20 or newer. Existing users should
 
 ```bash
 # Use dotjar service uninstall for a login service, otherwise dotjar stop
-npx --yes github:yx0716/dotjar#v0.4.0 install-managed
+npx --yes github:yx0716/dotjar#v0.4.1 install-managed
 ```
 
 Add `~/.local/bin` to PATH and use its `dotjar` command from then on. Run `dotjar service install` again if you want login startup. Existing settings, ledgers and notes stay in place; source checkouts are never overwritten. Older versions without this command need a one-time manual upgrade first.

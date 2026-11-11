@@ -24,7 +24,7 @@ dotjar update install
 
 ### 0.4.0 安装后提示「程序已安装，启动失败」
 
-0.4.0 的托管后台启动存在进程识别问题：网页服务已启动，安装命令仍可能报告「后台服务没起来」。先运行已有入口打开页面，不要删除安装目录或重复安装：
+此问题已在 0.4.1 修复。0.4.0 的托管后台启动存在进程识别问题：网页服务已启动，安装命令仍可能报告「后台服务没起来」。先运行已有入口打开页面，不要删除安装目录或重复安装：
 
 ```sh
 ~/.local/bin/dotjar
@@ -64,7 +64,7 @@ node scripts/release.js keygen
 
    也可以在仓库 Settings → Secrets and variables → Actions 中添加同名 Repository secret。私钥只能进入这个受控的 secret，不要粘贴到聊天、issue 或提交中。
 
-3. 确认发布版本未被使用，`package.json`、`package-lock.json` 的顶层版本及根包版本一致，并写好 `docs/release-notes.md`。在已合并且工作区干净的提交上创建并推送版本 tag；当前代码版本是 `0.4.0`，tag 必须和最终选定版本一致：
+3. 确认发布版本未被使用，`package.json`、`package-lock.json` 的顶层版本及根包版本一致，并写好 `docs/release-notes.md`。在已合并且工作区干净的提交上创建并推送版本 tag；当前代码版本是 `0.4.1`，tag 必须和最终选定版本一致：
 
    ```sh
    dotjarReleaseVersion=$(node -p 'require("./package.json").version')
