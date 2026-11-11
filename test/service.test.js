@@ -9,6 +9,44 @@ const { spawnSync } = require("child_process");
 
 const BIN = path.join(__dirname, "..", "bin", "dotjar.js");
 
+test("managed background startup recognizes the supervised server and can stop and restart it", { timeout: 30000 }, async (t) => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-managed-start-"));
+  const home = path.join(base, "data");
+  const version = require("../package.json").version;
+  const target = path.join(base, "releases", version);
+  fs.mkdirSync(target, { recursive: true });
+  for (const name of ["src", "bin", "package.json"]) {
+    fs.cpSync(path.join(__dirname, "..", name), path.join(target, name), { recursive: true });
+  }
+  const bin = require("../src/update/install").bootstrap(base, version, home);
+  const run = (...args) => spawnSync(process.execPath, [bin, ...args], {
+    env: { ...process.env, DOTJAR_HOME: home }, encoding: "utf8", timeout: 15000,
+  });
+  t.after(() => { run("stop"); fs.rmSync(base, { recursive: true, force: true }); });
+  let previousId;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const started = run("web", "--no-open", "--port", "0");
+    assert.equal(started.status, 0, started.stderr);
+    const pid = JSON.parse(fs.readFileSync(path.join(home, "web.pid"), "utf8"));
+    assert.ok(pid.startupId);
+    assert.notEqual(pid.startupId, previousId);
+    previousId = pid.startupId;
+    const token = fs.readFileSync(path.join(home, "web-token"), "utf8").trim();
+    const res = await fetch(`http://127.0.0.1:${pid.port}/api/updateHealth`, {
+      method: "POST", headers: { cookie: `dotjar_token=${token}`, "x-dotjar": "1" },
+    });
+    assert.equal(res.status, 200);
+    const health = (await res.json()).value;
+    assert.equal(health.version, version);
+    assert.equal(fs.realpathSync(health.root), fs.realpathSync(base));
+    const again = run("web", "--no-open", "--port", "0");
+    assert.equal(again.status, 0, again.stderr);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(home, "web.pid"), "utf8")).pid, pid.pid);
+    assert.match(run("stop").stdout, /已停掉/);
+    await assert.rejects(fetch(`http://127.0.0.1:${pid.port}/`));
+  }
+});
+
 test("npm start leaves the web version running in the background, and stop ends it", async (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-svc-"));
   const run = (...args) => spawnSync(process.execPath, [BIN, ...args], { env: { ...process.env, DOTJAR_HOME: home }, encoding: "utf8", timeout: 20000 });

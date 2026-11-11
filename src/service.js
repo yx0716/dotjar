@@ -10,6 +10,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { randomUUID } = require("crypto");
 const { spawn, spawnSync } = require("child_process");
 
 const config = require("./core/config");
@@ -30,7 +31,8 @@ function logFile() {
 
 function writePid(port) {
   fs.mkdirSync(config.dataDir(), { recursive: true });
-  fs.writeFileSync(pidFile(), JSON.stringify({ pid: process.pid, port }));
+  const startupId = process.env.DOTJAR_STARTUP_ID;
+  fs.writeFileSync(pidFile(), JSON.stringify({ pid: process.pid, port, ...(startupId ? { startupId } : {}) }));
   // Where this dotjar lives, so a desktop companion can start it again later.
   try {
     fs.writeFileSync(path.join(config.dataDir(), "install.json"), JSON.stringify({ bin: BIN, port }));
@@ -76,12 +78,12 @@ async function running() {
 }
 
 // A server process of its own, writing to the log, outliving whoever started it.
-function spawnServer(port) {
+function spawnServer(port, startupId = randomUUID()) {
   fs.mkdirSync(config.dataDir(), { recursive: true });
   const out = fs.openSync(logFile(), "a");
   const args = [BIN, "web", "--foreground", "--no-open"];
   if (port != null) args.push("--port", String(port));
-  const child = spawn(process.execPath, args, { detached: true, stdio: ["ignore", out, out], env: process.env });
+  const child = spawn(process.execPath, args, { detached: true, stdio: ["ignore", out, out], env: { ...process.env, DOTJAR_STARTUP_ID: startupId } });
   child.unref();
   fs.closeSync(out);
   return child;
@@ -90,11 +92,15 @@ function spawnServer(port) {
 // Start the server detached from this terminal and wait until it answers.
 async function startInBackground(options = {}) {
   const before = readPid();
-  const child = spawnServer(options.port);
+  const startupId = randomUUID();
+  spawnServer(options.port, startupId);
   for (let waited = 0; waited < 8000; waited += 150) {
     await sleep(150);
     const now = readPid();
-    if (now && now.pid === child.pid && (!before || before.pid !== now.pid)) {
+    // Managed installs spawn a supervisor, whose child owns the HTTP server.
+    // Correlate this launch through its environment instead of comparing PIDs;
+    // a different server or a stale pid file must not count as our startup.
+    if (now && now.startupId === startupId && alive(now.pid) && (!before || before.pid !== now.pid)) {
       const found = await server.find({ port: now.port, span: 1 });
       if (found) return { ...found, pid: now.pid };
     }
