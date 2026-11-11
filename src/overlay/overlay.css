@@ -2237,3 +2237,10 @@ button.growth-content:hover span {
 .update-action:focus-visible, .update-auto input:focus-visible { outline: 2px solid #9cded6; outline-offset: 3px; }
 .update-close { float: right; font-size: 13px; }
 .update-auto { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+
+/* Usage stays in the footer; the ledger opens only when requested. */
+.usage-link { text-underline-offset: 3px; text-decoration: underline; }
+.usage-dialog h2 { font-family: var(--font-ui, system-ui), sans-serif; }
+.usage-run { border-top: 1px solid rgba(255,255,255,.12); padding: 12px 0; }
+.usage-run h3 { margin: 0; font-size: 14px; }
+.usage-run p { margin: 8px 0; overflow-wrap: anywhere; }

@@ -21,6 +21,7 @@ function fakeSession() {
     engine: () => ({ engine: "claude-cli", engineModel: "", engines: [] }),
     setEngine: (id) => (calls.push(["engine", id]), { engine: id, engineModel: "", engines: [] }),
     today: async () => view,
+    usage: (day) => ({ records: [], total: 0, day }),
     isDistilling: () => false,
     distill: async () => ({ view, found: 0 }),
     keep: async (id) => (calls.push(["keep", id]), view),
@@ -78,6 +79,11 @@ test("the browser interface is only reachable with the token, from this machine"
   assert.ok(page.body.includes('<script src="web-bridge.js"></script>'));
   assert.equal((await request(port, { path: "/overlay.css", headers: { cookie } })).status, 200);
   assert.equal((await request(port, { path: "/library", headers: { cookie } })).body, "<h1>库存</h1>");
+
+  assert.equal((await request(port, { path: "/usage.js", headers: { cookie } })).status, 200);
+  assert.equal((await request(port, { path: "/usage.js" })).status, 403);
+  assert.equal((await request(port, { method: "POST", path: "/api/usage", headers: { "x-dotjar": "1" } }, "{}")).status, 403);
+  assert.deepEqual(JSON.parse((await post("usage", ["2026-06-10"])).body).value, { records: [], total: 0, day: "2026-06-10" });
 
   // The fonts the page carries are served like its other files, and may be kept for a day.
   const font = await request(port, { path: "/fonts/huiwen-mincho-titles.woff", headers: { cookie } });

@@ -117,6 +117,7 @@ function view(cfg, scanned) {
     },
     distilledAt: day.distilledAt,
     model: day.model,
+    latestRun: require("./runs").list(win.key).records[0] || null,
     turnsSince,
     // Whatever earlier days left undecided comes first, then this day's own.
     candidates: [...older, ...own.filter((i) => !olderIds.has(i.id))],
@@ -268,20 +269,28 @@ async function distillToday(cfg = config.load(), options = {}) {
     signal: options.signal,
     run: options.run,
   });
-  // Reload: the person may have kept or skipped something while this ran.
-  const day = ledger.saveDay(
-    ledger.applyDistilled(ledger.loadDay(win.key), res.items.filter((i) => !pendingIds.has(i.id)), {
-      at: startedAt,
-      model: res.model,
-      costUsd: res.costUsd,
-      stats: digest.stats,
-      tasks: res.tasks,
-      growth: res.growth,
-    })
-  );
-  const added = day.items.filter((i) => i.foundAt === startedAt).length;
-  // `again`: this day had been gone through before, so what was found is on top of that.
-  return { view: view(cfg, { ...scanned, day }), costUsd: res.costUsd, durationMs: res.durationMs, found: added, again: passes > 0 };
+  try {
+    // Reload: the person may have kept or skipped something while this ran.
+    const latest = ledger.loadDay(win.key);
+    const known = new Set(latest.items.map((item) => item.id));
+    const day = ledger.saveDay(
+      ledger.applyDistilled(latest, res.items.filter((i) => !pendingIds.has(i.id)), {
+        at: startedAt,
+        model: res.model,
+        costUsd: res.costUsd,
+        stats: digest.stats,
+        tasks: res.tasks,
+        growth: res.growth,
+      })
+    );
+    const added = day.items.filter((i) => !known.has(i.id)).length;
+    require("./runs").update(res.runRecord, { found: added });
+    // `again`: this day had been gone through before, so what was found is on top of that.
+    return { view: view(cfg, { ...scanned, day }), costUsd: res.costUsd, durationMs: res.durationMs, found: added, again: passes > 0 };
+  } catch (error) {
+    require("./runs").update(res.runRecord, { status: "failed", found: null, endedAt: Date.now() });
+    throw error;
+  }
 }
 
 const pad2 = (n) => String(n).padStart(2, "0");

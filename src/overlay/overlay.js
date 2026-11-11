@@ -549,6 +549,7 @@
     // The way to the other day: yesterday's leftovers from today, and back.
     if (v.daysBack) parts.push(`<button class="link" type="button" data-act="otherDay">${esc(T.backToToday)}</button><kbd>Y</kbd>`);
     else if (v.earlier) parts.push(`<button class="link" type="button" data-act="otherDay">${esc(T.seeYesterday)}</button><kbd>Y</kbd>`);
+    if (api.usage && window.DotjarUsage) parts.push(`<button class="link usage-link" type="button" data-act="usage" aria-haspopup="dialog">${esc(window.DotjarUsage.label(v.latestRun, document.documentElement.lang !== "en"))}</button>`);
     el.status.innerHTML = parts.join("");
   }
 
@@ -2056,6 +2057,11 @@
     } catch (err) {
       state.phase = "ready";
       state.error = errorText(err);
+      // A failed answer may still have consumed quota. Refresh just its record.
+      if (api.usage && state.view) {
+        try { state.view.latestRun = (await api.usage(state.view.day)).records[0] || null; }
+        catch { /* keep the original failure visible; details can be retried */ }
+      }
       render();
     } finally {
       clearInterval(ticker);
@@ -2146,6 +2152,7 @@
     skip: () => decide("skip"),
     copy: copyDraft,
     undo,
+    usage: () => window.DotjarUsage.open(api, state.view.day, document.documentElement.lang !== "en"),
     distill: () => distill(),
     paste,
     dest: chooseDest,

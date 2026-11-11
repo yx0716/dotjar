@@ -50,6 +50,7 @@
     today: (daysBack) => call("today", daysBack),
     distill: (days) => call("distill", days),
     calendar: (month) => call("calendar", month),
+    usage: (day) => call("usage", day),
     distilling: () => call("distilling"),
     setEngine: (id) => call("setEngine", id),
     restart: () => call("restart"),
