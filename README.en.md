@@ -44,6 +44,8 @@ The development branch now records individual runs (not yet released). Click the
 
 ## Updates
 
+A macOS double-click installer is available as a test build. Open dotjar from Applications after installation; Node.js is bundled and first-time setup uses an embedded release without downloading it. This is currently an **unnotarized test build** and macOS may require a manual allowance in Privacy & Security. It is not yet a signed, notarized public distribution. See [macOS installer](docs/macos-installer.md) (Chinese) for building, testing and signing.
+
 Signed update packages are supported from v0.4.0. Managed installation downloads the latest stable GitHub Release.
 
 Managed installation supports macOS with Node 20 or newer. Existing users should stop the old service first; new users can run this directly:

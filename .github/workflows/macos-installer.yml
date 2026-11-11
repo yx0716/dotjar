@@ -1,0 +1,50 @@
+name: macOS installer (test)
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Existing signed dotjar release to embed
+        required: true
+        default: '0.4.1'
+  pull_request:
+    paths:
+      - 'packaging/macos/**'
+      - 'scripts/package-macos.js'
+      - 'scripts/smoke-macos.js'
+      - 'src/update/desktop.js'
+      - 'test/desktop-install.test.js'
+      - '.github/workflows/macos-installer.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
+      - name: Build unsigned test installer
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version || '0.4.1' }}
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: node scripts/package-macos.js --arch="$BUILD_ARCH" --version="$RELEASE_VERSION"
+      - name: Test native-architecture bundled runtime
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: |
+          if [ "$(node -p process.arch)" = "$BUILD_ARCH" ]; then
+            node scripts/smoke-macos.js "dist/macos/$BUILD_ARCH/dotjar.app"
+          else
+            echo "Cross-compiled package; runtime smoke test requires a matching Mac."
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dotjar-macOS-${{ matrix.arch }}-unsigned-test
+          path: |
+            dist/macos/${{ matrix.arch }}/*.pkg
+            dist/macos/${{ matrix.arch }}/*.sha256
