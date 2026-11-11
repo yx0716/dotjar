@@ -2244,3 +2244,7 @@ button.growth-content:hover span {
 .usage-run { border-top: 1px solid rgba(255,255,255,.12); padding: 12px 0; }
 .usage-run h3 { margin: 0; font-size: 14px; }
 .usage-run p { margin: 8px 0; overflow-wrap: anywhere; }
+
+.arriving-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin: 12px auto; max-width: 900px; font: 14px/1.6 var(--sans); color: var(--muted); }
+.arriving-cards button { color: var(--ink); }
+.btn:disabled { opacity: .5; cursor: default; }

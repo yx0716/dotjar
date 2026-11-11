@@ -170,6 +170,8 @@ function createApi(session, options = {}) {
       language: session.config.language,
     }),
     today: (back) => session.today(back),
+    startDistill: (days) => session.startDistill(days),
+    jobStatus: (id) => session.jobStatus(id),
     distill: (days) => session.distill(days),
     calendar: (month) => session.calendar(month),
     usage: (day) => session.usage(day),

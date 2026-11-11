@@ -19,7 +19,7 @@ function write(record) {
 function start(day, engine, model) {
   return write({ id: crypto.randomUUID(), day, engine, model: model || null,
     version: require("../../package.json").version, pid: process.pid, startedAt: Date.now(),
-    endedAt: null, status: "running", usage: null, found: null });
+    endedAt: null, status: "running", usage: null, usageComplete: false, found: null });
 }
 function update(record, patch) { return write(Object.assign(record, patch)); }
 function list(day) {

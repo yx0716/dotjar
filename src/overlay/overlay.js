@@ -62,6 +62,8 @@
     switching: false,
     // The calendar under the date: which month it shows, what it knows, what is ticked.
     cal: { open: false, month: "", data: null, loading: false, ticked: new Set() },
+    job: null,
+    preview: [],
     batch: null, // { done, total, day } while picked days are being gone through
   };
   let ticker = null;
@@ -126,7 +128,10 @@
   }
 
   function candidates() {
-    return state.view ? state.view.candidates : [];
+    if (!state.view) return [];
+    const known = new Set([...state.view.candidates, ...state.view.kept].map((item) => item.id));
+    const preview = state.job?.day === state.view.day ? state.preview.filter((item) => !known.has(item.id)) : [];
+    return [...state.view.candidates, ...preview];
   }
 
   function focused() {
@@ -238,7 +243,7 @@
     el.tabs.hidden = false;
     const tab = (id, label, n, key) =>
       `<button class="tab" type="button" role="tab" data-tab="${id}" aria-selected="${state.tab === id}" title="${esc(T.tabHint(key))}">${label}${n === null ? "" : `<b>${n}</b>`}</button>`;
-    el.tabs.innerHTML = tab("today", esc(T.tabToday), null, "1") + tab("open", esc(T.tabOpen), v.candidates.length, "2") + tab("settled", esc(T.tabDone), settledRows().length, "3");
+    el.tabs.innerHTML = tab("today", esc(T.tabToday), null, "1") + tab("open", esc(T.tabOpen), candidates().length, "2") + tab("settled", esc(T.tabDone), settledRows().length, "3");
     if (state.bump) el.tabs.querySelector('.tab[data-tab="settled"] b').classList.add("is-bumped");
     state.bump = false;
   }
@@ -384,16 +389,17 @@
     if (state.switching) {
       return lead(T.switchingTo(T.date(state.switching)), `<p class="lead-text">${esc(T.switchingText)}</p>${reading()}`);
     }
-    if (state.phase === "distilling") {
+    const readable = candidates().length || v.kept.length || (v.tasks && v.tasks.length);
+    if (state.phase === "distilling" && !readable && state.tab !== "settled") {
       if (state.batch) return lead(T.batching, `<p class="lead-text">${esc(T.batchText(state.batch.total))}</p>${fishing()}`);
       return lead(T.distilling, `<p class="lead-text">${esc(T.distillingText(engineInline()))}</p>${fishing()}`);
     }
-    if (state.error) {
+    if (state.error && !readable) {
       return lead(T.distillFail, `<p class="lead-error">${esc(state.error)}</p><div class="card-foot"><button class="btn primary" type="button" data-act="distill">${esc(T.retry)} <kbd>↵</kbd></button></div>`);
     }
     if (state.tab === "settled") return renderSettled();
     if (state.tab === "today" && v.tasks && v.tasks.length) return renderOverview(v);
-    if (v.candidates.length) return renderDeck(v);
+    if (candidates().length) return renderDeck(v);
 
     if (!v.stats.sessions) {
       // Nothing of their own to look at yet: the made-up day shows what a
@@ -426,7 +432,7 @@
   }
 
   function renderDeck(v) {
-    const list = v.candidates;
+    const list = candidates();
     const cur = focused();
     state.focusId = cur.id;
     const i = list.indexOf(cur);
@@ -455,7 +461,7 @@
       ${arrow(list[i + 1], "next", 1)}
       <article class="card" data-kind="${esc(cur.kind)}" data-id="${esc(cur.id)}">
         <header class="card-head">
-          <span class="kind" title="${esc((T.kindHints && T.kindHints[cur.kind]) || "")}"><i class="dot"></i>${esc(T.kinds[cur.kind] || cur.kind)}</span>
+          <span class="kind" title="${esc((T.kindHints && T.kindHints[cur.kind]) || "")}"><i class="dot"></i>${esc(T.kinds[cur.kind] || cur.kind)}${cur.preview ? ` · ${esc(T.previewLabel)}` : ""}</span>
           ${carried ? `<span class="carried">${esc(carried)}</span>` : ""}
           <span class="from">${esc(from)}</span>
           ${pips}
@@ -464,8 +470,8 @@
         ${cur.payoff ? `<p class="payoff"><b>${esc(T.usefulWhen)}</b>${esc(cur.payoff)}</p>` : ""}
         <div class="md" tabindex="0">${renderMarkdown(cur.draft)}</div>
         <footer class="card-foot">
-          <button class="btn primary" type="button" data-act="keep">${esc(T.keep)} <kbd>↵</kbd></button>
-          <button class="btn" type="button" data-act="skip">${esc(T.skip)} <kbd>⌫</kbd></button>
+          <button class="btn primary" type="button" data-act="keep" ${cur.preview ? "disabled" : ""}>${esc(cur.preview ? (state.phase === "distilling" ? T.previewWait : T.previewIncomplete) : T.keep)} <kbd>↵</kbd></button>
+          <button class="btn" type="button" data-act="skip" ${cur.preview ? "disabled" : ""}>${esc(T.skip)} <kbd>⌫</kbd></button>
           <button class="btn" type="button" data-act="copy">${esc(T.copy)} <kbd>C</kbd></button>
           <span class="dest" title="${esc(v.depositDir)}">${esc(T.savesTo(shortPath(v.depositDir)))}<button class="link" type="button" data-act="dest">${esc(T.change)}</button></span>
         </footer>
@@ -513,6 +519,7 @@
   }
 
   function renderStatus() {
+    for (const button of document.querySelectorAll('[data-act="distill"]')) button.disabled = state.phase === "distilling";
     const v = state.view;
     if (state.toast) {
       el.status.className = "status is-toast";
@@ -531,10 +538,13 @@
     }
     if (state.phase === "distilling") {
       const secs = Math.max(0, Math.round((Date.now() - state.distillStart) / 1000));
-      el.status.textContent = state.batch ? T.batchStatus(state.batch.done, state.batch.total, T.date(state.batch.day)) : T.distillingStatus(secs);
+      const count = candidates().filter((item) => item.preview).length;
+      const status = state.batch ? T.batchStatus(state.batch.done, state.batch.total, T.date(state.batch.day)) : T.distillingStatus(secs);
+      el.status.innerHTML = `<span>${esc(status)}</span>${count ? `<button class="link" type="button" data-act="preview">${esc(T.previewCount(count))}</button>` : ""}`;
       return;
     }
     const parts = [];
+    if (state.error) parts.push(`<span class="is-warn">${esc(T.distillFail)}：${esc(state.error)}</span>`);
     if (!host && /^https?:$/.test(location.protocol)) parts.push(`<span>${esc(T.demoNote)}</span><a class="link" href="/">${esc(T.backToToday)}</a>`);
     // The server behind the page is older than its files: what it answers may
     // not match what the page asks.
@@ -603,11 +613,14 @@
       if (v.turnsSince) foot += ` <button class="btn" type="button" data-act="distill">${esc(T.refreshNew(v.turnsSince))} <kbd>R</kbd></button>`;
     }
     const growth = renderGrowth(v);
+    const fresh = candidates().filter((item) => item.preview);
+    const arrivingCards = fresh.length ? `<div class="arriving-cards"><span>${esc(T.previewLabel)}</span>${fresh.map((item) => `<button class="link" type="button" data-act="preview" data-preview-id="${esc(item.id)}">✦ ${esc(item.title)}</button>`).join("")}</div>` : "";
     el.stage.innerHTML = `
       <section class="overview">
         ${v.tasksAreRough ? `<p class="epigraph">${esc(T.epigraph)}</p>` : ""}
         <h2 class="overview-title">${esc(title)}</h2>
         ${growth}
+        ${arrivingCards}
         <p class="overview-key">${key}</p>
         <div class="flow"></div>
         <div class="overview-foot">${foot}</div>
@@ -1785,7 +1798,7 @@
 
   function setView(v) {
     state.view = v;
-    if (!v.candidates.some((c) => c.id === state.focusId)) state.focusId = v.candidates[0] ? v.candidates[0].id : null;
+    if (!candidates().some((c) => c.id === state.focusId)) state.focusId = candidates()[0]?.id || null;
   }
 
   let refreshing = null;
@@ -1805,8 +1818,15 @@
       const lang = params.get("lang") || window.DotjarWords.language(meta.language) || navigator.language;
       T = window.DotjarWords.copy(lang, params.get("words") || meta.wording, v.daysBack, v.day);
       setView(v);
-      if (running && state.phase !== "distilling") watchDistill(running.total > 1 ? running : null);
-      else if (state.phase === "loading") state.phase = "ready";
+      if (running && state.phase !== "distilling") watchDistill(running);
+      else if (state.phase === "loading") {
+        state.phase = "ready";
+        // Reopening the tab while/after a background run should recover its outcome.
+        if (api.jobStatus) {
+          const last = await api.jobStatus();
+          if (last?.status === "failed") { state.job = last; state.preview = last.preview.map((item) => ({ ...item, preview: true })); state.error = last.error; }
+        }
+      }
     } catch (err) {
       state.phase = "ready";
       state.error = errorText(err);
@@ -1962,7 +1982,7 @@
 
   async function decide(verb) {
     const cur = focused();
-    if (!cur || state.busy || state.tab !== "open") return;
+    if (!cur || cur.preview || state.busy || state.tab !== "open") return;
     state.busy = true;
     const card = el.stage.querySelector(".card");
     const list = candidates();
@@ -2019,22 +2039,56 @@
     toast(T.copied);
   }
 
-  function watchDistill(batch) {
+  let pollingJob = false;
+  function watchDistill(job) {
     state.phase = "distilling";
     state.error = null;
-    if (batch) state.batch = batch;
-    if (!state.distillStart) state.distillStart = Date.now();
+    if (job) { state.job = job; state.batch = job.total > 1 ? job : null; state.preview = (job.preview || []).map((item) => ({ ...item, day: job.day, preview: true })); }
+    if (!state.distillStart) state.distillStart = job?.startedAt || Date.now();
     clearInterval(ticker);
     ticker = setInterval(async () => {
-      if (state.batch) {
-        try {
+      if (pollingJob) return;
+      pollingJob = true;
+      try {
+        if (api.jobStatus && state.job?.id) {
+          const id = state.job.id;
+          const next = await api.jobStatus(id);
+          if (state.job?.id !== id) return;
+          if (!next) {
+            clearInterval(ticker); state.phase = "ready"; state.error = T.jobLost; render(); return;
+          }
+          const changed = next.revision !== state.job.revision || next.day !== state.job.day;
+          state.job = next; state.batch = next.total > 1 ? next : null;
+          state.preview = (next.preview || []).map((item) => ({ ...item, day: next.day, preview: true }));
+          if (next.status !== "running") {
+            clearInterval(ticker); state.phase = "ready"; state.distillStart = 0; state.batch = null;
+            if (next.status === "succeeded") {
+              state.preview = [];
+              const result = next.result;
+              setView(result.view.day === state.view.day ? result.view : await api.today(state.view.day));
+              render();
+              toast(result.days > 1 ? T.batchDone(result.days, result.found) + (result.failed?.length ? T.batchFailed(result.failed.length) : "") : result.found ? T.distillDone(result.found) : T.distillNone);
+            } else {
+              state.error = errorText({ message: next.error, code: next.code });
+              if (api.usage) { try { state.view.latestRun = (await api.usage(state.view.day)).records[0] || null; } catch {} }
+              render();
+            }
+          } else if (changed) {
+            // New cards may arrive while someone is reading an older one.
+            const scroll = el.stage.querySelector(".md")?.scrollTop;
+            render();
+            const body = el.stage.querySelector(".md"); if (body && scroll != null) body.scrollTop = scroll;
+          }
+        } else {
           const p = await api.distilling();
-          if (p && p.total) state.batch = p;
-        } catch {
-          // keep the last known progress
+          if (p && p.total > 1) state.batch = p;
+          if (!p) { clearInterval(ticker); state.phase = "ready"; await refresh(); }
         }
-      }
-      renderStatus();
+        renderStatus();
+      } catch {
+        // Losing the connection never restarts a chargeable job. Poll again.
+        renderStatus();
+      } finally { pollingJob = false; }
     }, 1000);
   }
 
@@ -2043,7 +2097,24 @@
     if (state.phase === "distilling" || !state.view) return;
     const many = Array.isArray(days) && days.length ? days : null;
     state.distillStart = Date.now();
-    state.tab = "today";
+    state.preview = []; state.job = null; state.toast = null;
+    // New servers return immediately. The long-lived promise belongs to the
+    // session, so closing/reloading a browser never resubmits the model call.
+    if (api.startDistill) {
+      state.phase = "distilling"; state.error = null; render();
+      try {
+        const accepted = await api.startDistill(many || undefined);
+        watchDistill({ ...accepted, total: many ? many.length : 1, done: 0, day: many ? many[0] : state.view.day });
+      } catch (error) {
+        // The response might have been lost after acceptance: recover, don't retry.
+        try {
+          const running = await api.distilling();
+          if (running) watchDistill(running);
+          else { state.phase = "ready"; state.error = errorText(error); render(); }
+        } catch { state.phase = "ready"; state.error = T.jobLost; render(); }
+      }
+      return;
+    }
     watchDistill(many ? { done: 0, total: many.length, day: many[0] } : null);
     render();
     try {
@@ -2152,6 +2223,10 @@
     skip: () => decide("skip"),
     copy: copyDraft,
     undo,
+    preview: (id) => {
+      const item = candidates().find((candidate) => candidate.preview && (!id || candidate.id === id));
+      if (item) { state.focusId = item.id; state.tab = "open"; render(); }
+    },
     usage: () => window.DotjarUsage.open(api, state.view.day, document.documentElement.lang !== "en"),
     distill: () => distill(),
     paste,
@@ -2172,6 +2247,7 @@
 
   document.addEventListener("click", (e) => {
     const act = e.target.closest("[data-act]");
+    if (act && act.dataset.act === "preview") return void actions.preview(act.dataset.previewId);
     if (act && act.dataset.act === "dot") return void openDot(act.dataset.id);
     if (act && act.dataset.act === "applied") return void openApplied(Number(act.dataset.n));
     if (act) return void actions[act.dataset.act]();
@@ -2257,7 +2333,7 @@
     }
     // A focused button handles its own Enter and Space.
     const onButton = document.activeElement && ["BUTTON", "INPUT"].includes(document.activeElement.tagName);
-    const deciding = state.tab === "open" && candidates().length > 0 && state.phase !== "distilling" && !state.error;
+    const deciding = state.tab === "open" && candidates().length > 0 && !focused()?.preview && !state.error;
     switch (e.key) {
       case "Escape":
         // Out of the cards or the list first; from the day itself, put the veil away.
@@ -2288,7 +2364,7 @@
         if (deciding) decide("skip");
         break;
       case "c":
-        if (deciding) copyDraft();
+        if (state.tab === "open" && focused()) copyDraft();
         break;
       case "r":
         if (state.view && state.view.stats.sessions) distill();

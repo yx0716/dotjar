@@ -357,16 +357,23 @@ function parseCliOutput(stdout) {
   return meta;
 }
 
-function runClaude({ claudePath, model, prompt, cwd, timeoutMs = TIMEOUT_MS, signal }) {
+const claudeStreaming = new Map();
+function runClaude({ claudePath, model, prompt, cwd, timeoutMs = TIMEOUT_MS, signal, onText, onUsage }) {
+  if (onText && !claudeStreaming.has(claudePath)) {
+    const probe = require("child_process").spawnSync(claudePath, ["--help"], { encoding: "utf8", timeout: 8000, env: cliEnv() });
+    claudeStreaming.set(claudePath, (probe.stdout || "").includes("--include-partial-messages"));
+  }
+  const streaming = onText && claudeStreaming.get(claudePath);
   return new Promise((resolve, reject) => {
     const args = [
       "-p",
-      "--output-format", "json",
+      "--output-format", streaming ? "stream-json" : "json",
       "--tools", "",
       "--disable-slash-commands",
       "--no-session-persistence",
       "--append-system-prompt", SYSTEM_NUDGE,
     ];
+    if (streaming) args.push("--verbose", "--include-partial-messages");
     if (model) args.push("--model", model);
     let child;
     try {
@@ -376,7 +383,7 @@ function runClaude({ claudePath, model, prompt, cwd, timeoutMs = TIMEOUT_MS, sig
       reject(err);
       return;
     }
-    let stdout = "";
+    let stdout = "", line = "", text = "", measured = null;
     let stderr = "";
     let done = false;
     const finish = (fn, value) => {
@@ -384,6 +391,7 @@ function runClaude({ claudePath, model, prompt, cwd, timeoutMs = TIMEOUT_MS, sig
       done = true;
       clearTimeout(timer);
       if (signal) signal.removeEventListener("abort", onAbort);
+      if (value instanceof Error && measured && !value.usage) value.usage = measured;
       fn(value);
     };
     const onAbort = () => {
@@ -396,10 +404,40 @@ function runClaude({ claudePath, model, prompt, cwd, timeoutMs = TIMEOUT_MS, sig
     }, timeoutMs);
     if (signal) signal.addEventListener("abort", onAbort, { once: true });
 
-    child.stdout.on("data", (b) => (stdout += b));
+    function streamEvent(value) {
+      let message;
+      try { message = JSON.parse(value); } catch { return; }
+      if (message.type === "result") {
+        stdout = JSON.stringify(message);
+        measured = usage.normalize("claude-cli", message.usage, message.total_cost_usd);
+        onUsage?.(measured);
+      }
+      if (message.type === "stream_event") {
+        const event = message.event;
+        if (event?.type === "message_start") text = "";
+        if (event?.type === "content_block_delta" && event.delta?.type === "text_delta") {
+          text += event.delta.text;
+          if (text.length > 2 * 1024 * 1024) throw new Error("模型返回的内容过长");
+          onText(text);
+        }
+      }
+    }
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (b) => {
+      if (done) return;
+      try {
+        if (!streaming) { stdout += b; return; }
+        line += b;
+        if (line.length > 4 * 1024 * 1024) throw new Error("模型事件过长");
+        let end;
+        while ((end = line.indexOf("\n")) >= 0) { const value = line.slice(0, end); line = line.slice(end + 1); streamEvent(value); }
+      } catch (error) { child.kill("SIGTERM"); finish(reject, error); }
+    });
     child.stderr.on("data", (b) => (stderr = (stderr + b).slice(-4000)));
     child.on("error", (err) => finish(reject, err));
     child.on("close", (code) => {
+      if (done) return;
+      try { if (streaming && line.trim()) streamEvent(line); } catch (error) { finish(reject, error); return; }
       if (code !== 0 && !stdout.trim()) {
         finish(reject, new Error(`claude 退出码 ${code}：${stderr.trim().split("\n").pop() || "没有错误输出"}`));
         return;
@@ -440,7 +478,12 @@ function codexSupports(codexPath, flag) {
 // One headless turn of `codex exec`: prompt on stdin, the last message in a
 // file. Read-only, no web search, and no session left behind when the CLI
 // allows it.
-function runCodex({ codexPath, model, effort = "low", prompt, cwd, timeoutMs = TIMEOUT_MS, signal }) {
+async function runCodex(options) {
+  const { codexPath, model, effort = "low", prompt, cwd, timeoutMs = TIMEOUT_MS, signal, onText } = options;
+  if (onText) {
+    try { return await require("./codex-stream").runCodexStream({ ...options, env: cliEnv() }); }
+    catch (error) { if (error.code !== "NO_STREAM" || signal?.aborted) throw error; }
+  }
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-codex-"));
@@ -529,10 +572,10 @@ function runCodex({ codexPath, model, effort = "low", prompt, cwd, timeoutMs = T
 function apiSettings(config) {
   const api = config.api || {};
   const apiKey = (api.apiKeyEnv && process.env[api.apiKeyEnv]) || api.apiKey || "";
-  return { baseUrl: String(api.baseUrl || "").replace(/\/+$/, ""), model: api.model || "", apiKey };
+  return { baseUrl: String(api.baseUrl || "").replace(/\/+$/, ""), model: api.model || "", apiKey, stream: api.stream !== false };
 }
 
-async function runOpenAI({ baseUrl, model, apiKey, prompt, timeoutMs = TIMEOUT_MS, signal, fetchImpl = fetch }) {
+async function runOpenAI({ baseUrl, model, apiKey, prompt, timeoutMs = TIMEOUT_MS, signal, fetchImpl = fetch, onText, onUsage, stream = true }) {
   const started = Date.now();
   const signals = [AbortSignal.timeout(timeoutMs)];
   if (signal) signals.push(signal);
@@ -546,6 +589,7 @@ async function runOpenAI({ baseUrl, model, apiKey, prompt, timeoutMs = TIMEOUT_M
       body: JSON.stringify({
         model,
         temperature: 0.2,
+        ...(onText && stream ? { stream: true, stream_options: { include_usage: true } } : {}),
         messages: [
           { role: "system", content: SYSTEM_NUDGE },
           { role: "user", content: prompt },
@@ -557,6 +601,9 @@ async function runOpenAI({ baseUrl, model, apiKey, prompt, timeoutMs = TIMEOUT_M
     if (signal && signal.aborted) throw new Error("已取消");
     if (err && err.name === "TimeoutError") throw new Error(`接口超过 ${Math.round(timeoutMs / 1000)} 秒没有返回`);
     throw new Error(`连不上 ${baseUrl}：${(err && err.cause && err.cause.message) || (err && err.message) || err}`);
+  }
+  if (response.ok && response.headers?.get("content-type")?.includes("text/event-stream")) {
+    return { ...await require("./chat-stream").readChatStream(response, { model, onText, onUsage }), durationMs: Date.now() - started };
   }
   const body = await response.text();
   if (!response.ok) {
@@ -607,10 +654,17 @@ function fail(message, code) {
   return err;
 }
 
-async function distill({ config, cwd, dayKey, digest, settled, kept, pending, skipped, language, signal, run }) {
+async function distill({ config, cwd, dayKey, digest, settled, kept, pending, skipped, language, signal, run, onProgress }) {
   const prompt = buildPrompt({ dayKey, digest, settled, kept, pending, skipped, language });
   const engine = resolveEngine(config);
   const record = runs.start(dayKey, engine, engine === "openai" ? config.api?.model : engine === "codex-cli" ? config.codexModel : config.model);
+  let previous = "";
+  const onText = onProgress ? (text) => {
+    const items = normalizeItems({ items: require("./partial-items").partialItems(text) });
+    const key = JSON.stringify(items);
+    if (key !== previous) { previous = key; onProgress(items); }
+  } : undefined;
+  const onUsage = (measured) => runs.update(record, { usage: measured, usageComplete: false });
   let res;
   try {
     if (signal?.aborted) throw new Error("已取消");
@@ -619,21 +673,21 @@ async function distill({ config, cwd, dayKey, digest, settled, kept, pending, sk
       if (!api.baseUrl || !api.model) {
         throw fail("还没配置模型接口。在 ~/.dotjar/config.json 的 api 里填写 baseUrl 和 model（密钥填 apiKey，或用 apiKeyEnv 指向环境变量）。", "NO_API");
       }
-      res = await (run || runOpenAI)({ ...api, prompt, signal });
+      res = await (run || runOpenAI)({ ...api, prompt, signal, onText, onUsage });
     } else if (engine === "codex-cli") {
       const codexPath = findCodex(config.codexPath);
       if (!codexPath) throw fail("找不到 codex 命令。在终端运行 which codex 确认已安装，或者换成 Claude 来整理。", "NO_CODEX");
-      res = await (run || runCodex)({ codexPath, model: config.codexModel, effort: config.codexEffort, prompt, cwd, signal });
+      res = await (run || runCodex)({ codexPath, model: config.codexModel, effort: config.codexEffort, prompt, cwd, signal, onText, onUsage });
     } else {
       const claudePath = findClaude(config.claudePath);
       if (!claudePath) {
         throw fail("这台机器上没找到 claude 或 codex 命令。装上其中一个；都装不了的话，在 ~/.dotjar/config.json 的 api 里填一个 OpenAI 兼容的接口。", "NO_CLI");
       }
-      res = await (run || runClaude)({ claudePath, model: config.model, prompt, cwd, signal });
+      res = await (run || runClaude)({ claudePath, model: config.model, prompt, cwd, signal, onText, onUsage });
     }
     // Persist accounting before interpreting the model's answer: invalid JSON
     // can still cost tokens. Never retain the prompt, reply or raw CLI logs.
-    runs.update(record, { usage: res.usage || usage.normalize(engine, null, res.costUsd), model: res.model || record.model });
+    runs.update(record, { usage: res.usage || record.usage || usage.normalize(engine, null, res.costUsd), usageComplete: true, model: res.model || record.model });
     const parsed = extractJson(res.text);
     const items = normalizeItems(parsed);
     runs.update(record, { status: "succeeded", endedAt: Date.now(), found: items.length });
