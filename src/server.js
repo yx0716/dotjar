@@ -55,6 +55,7 @@ const STATIC = {
   "/markdown.js": ["markdown.js", "text/javascript; charset=utf-8"],
   "/words.js": ["words.js", "text/javascript; charset=utf-8"],
   "/growth.js": ["growth.js", "text/javascript; charset=utf-8"],
+  "/overview-data.js": ["overview-data.js", "text/javascript; charset=utf-8"],
   "/usage.js": ["usage.js", "text/javascript; charset=utf-8"],
   "/updates.js": ["updates.js", "text/javascript; charset=utf-8"],
   "/demo-data.js": ["demo-data.js", "text/javascript; charset=utf-8"],

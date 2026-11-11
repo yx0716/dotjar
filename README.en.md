@@ -26,6 +26,8 @@ npx github:yx0716/dotjar demo
 - **What the work taught**: judgement that carries to the next project, in three kinds: a way of going at a kind of problem (strategy), a judgement the work earned (lesson), a case that is easy to leave out (blind spot). One card at a time, keep or skip; what you keep is plain Markdown.
 - **How you are getting on**: one specific thing you did well and actions the model matched to earlier keepers. Check a feedback row to tuck it away in a small burst of starlight; expand it again whenever you like. Checking acknowledges reading, not agreement with the model.
 
+The overview shows each task’s time, title and star count. Open a task for your contribution, the agent’s work, uncertainties and every related star. Each group holds up to six tasks in wide windows or three in narrow ones (including unassigned stars); use the group controls for more. Two reflections are shown initially; expanding the rest does not mark them as read.
+
 ![A card](docs/en/card.png)
 
 ## Breaks

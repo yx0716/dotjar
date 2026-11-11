@@ -80,6 +80,8 @@ test("the browser interface is only reachable with the token, from this machine"
   assert.equal((await request(port, { path: "/overlay.css", headers: { cookie } })).status, 200);
   assert.equal((await request(port, { path: "/library", headers: { cookie } })).body, "<h1>库存</h1>");
 
+  assert.equal((await request(port, { path: "/overview-data.js", headers: { cookie } })).status, 200);
+  assert.equal((await request(port, { path: "/overview-data.js" })).status, 403);
   assert.equal((await request(port, { path: "/usage.js", headers: { cookie } })).status, 200);
   assert.equal((await request(port, { path: "/usage.js" })).status, 403);
   assert.equal((await request(port, { method: "POST", path: "/api/usage", headers: { "x-dotjar": "1" } }, "{}")).status, 403);
