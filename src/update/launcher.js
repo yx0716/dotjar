@@ -11,6 +11,8 @@ async function main(args = process.argv.slice(2)) {
   const base = root();
   const install = read(path.join(base, "installation.json"));
   if (!install) throw new Error("托管安装记录缺失");
+  process.env.DOTJAR_PROFILE = install.profile || "production";
+  if (install.verifyRoot) process.env.DOTJAR_VERIFY_ROOT = install.verifyRoot;
   process.env.DOTJAR_HOME = install.dataDir;
   process.env.DOTJAR_INSTALL_ROOT = base;
   process.env.DOTJAR_MANAGED_ROOT = base;

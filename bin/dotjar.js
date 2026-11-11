@@ -17,7 +17,8 @@ const USAGE = `用法：dotjar [命令]
   （不带命令）  启动，并在浏览器里打开。服务在后台跑，终端可以关掉
                 --port <n> 指定端口（默认 4747）  --no-open 不打开浏览器  --foreground 留在这个终端里跑
   update        check：检查新版   status：查看状态   install：更新托管版并重启
-  install-managed  首次安装或迁移到可一键更新的托管版（macOS）
+  install-managed  --version <版本> --entry-dir <命令目录>（可选）
+                   首次安装或迁移到可一键更新的托管版（macOS）
   demo          用演示数据看看样子，不读本机任何东西
   stop          停掉后台的服务
   service       install：登录时自动启动，之后只用开收藏夹   uninstall：取消   status：看看现在怎样
@@ -49,6 +50,12 @@ async function main() {
   // No command, or only flags: start the page.
   const first = process.argv[2];
   const cmd = !first || first.startsWith("--port") || first === "--no-open" || first === "--foreground" ? "web" : first;
+  // A source checkout must opt into its own data context. A bare npm start
+  // must never silently become the customer's production installation.
+  const sourceCheckout = require("fs").existsSync(require("path").resolve(__dirname, "../.git"));
+  if (sourceCheckout && !process.env.DOTJAR_PROFILE && !process.env.DOTJAR_HOME && !process.env.STRATA_HOME && !["help", "--help", "-h", "--version", "-v", "demo"].includes(cmd)) {
+    throw new Error("这是开发源码，请用 npm run dev 启动隔离环境；客户版请使用已安装的 dotjar 入口");
+  }
   const cfg = config.load();
 
   if (cmd === "help" || cmd === "--help" || cmd === "-h") {
@@ -61,7 +68,8 @@ async function main() {
   }
 
   if (cmd === "install-managed") {
-    const result = await require("../src/update/install").install();
+    const option = (name) => { const i = process.argv.indexOf(name); if (i === -1) return undefined; if (!process.argv[i + 1] || process.argv[i + 1].startsWith("--")) throw new Error(`${name} 缺少值`); return process.argv[i + 1]; };
+    const result = await require("../src/update/install").install({ version: option("--version"), entryDir: option("--entry-dir") });
     line(`已安装 ${result.version}：${result.entry}，请确保 ~/.local/bin 在 PATH 中。`);
     line(result.output);
     return;
@@ -126,6 +134,8 @@ async function main() {
     const open = !args.includes("--no-open");
 
     if (args.includes("--foreground")) {
+      const existing = await service.running();
+      if (existing) { if (open) server.openInBrowser(existing.url); line(`dotjar 已经在 ${existing.port} 端口运行。`); return; }
       const res = await server.start({ port, restartable: true, watchRest: true });
       if (res.reused) {
         line(`dotjar 已经在 ${res.port} 端口运行。`);

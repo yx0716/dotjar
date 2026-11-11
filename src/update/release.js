@@ -45,12 +45,15 @@ function verify(envelope, keys, platform = process.platform, arch = process.arch
   if (typeof m.notes !== "string" || m.notes.length > 12000) throw new Error("更新说明格式不正确");
   return m;
 }
-async function latest(keys, fetcher = fetch) {
-  const info = JSON.parse((await download(`https://api.github.com/repos/${REPO}/releases/latest`, 1024 * 1024, fetcher)).toString());
+async function latest(keys, fetcher = fetch, version) {
+  if (version !== undefined && !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error("无效的目标版本号");
+  const endpoint = version ? `tags/v${version}` : "latest";
+  const info = JSON.parse((await download(`https://api.github.com/repos/${REPO}/releases/${endpoint}`, 1024 * 1024, fetcher)).toString());
   if (info.draft || info.prerelease || !/^v\d+\.\d+\.\d+$/.test(info.tag_name)) throw new Error("没有可用的稳定版本");
   const url = `https://github.com/${REPO}/releases/download/${info.tag_name}/dotjar-update.json`;
   const envelope = JSON.parse((await download(url, 128 * 1024, fetcher)).toString());
   const m = verify(envelope, keys);
+  if (version && m.version !== version) throw new Error("目标版本与发布包不一致");
   if (`v${m.version}` !== info.tag_name) throw new Error("发布标签与签名版本不一致");
   return envelope;
 }

@@ -70,6 +70,7 @@ function installOffline({ base, dataDir, payload, node, keys = read(path.resolve
 }
 
 async function main(resources, options = {}) {
+  if (require("../core/instance").profile() !== "production") throw new Error("开发/验收环境请使用隔离的命令行入口，不安装系统应用入口");
   if (process.getuid?.() === 0) throw new Error("请从「应用程序」以自己的账号打开 dotjar，不要以管理员身份运行。");
   // Finder does not inherit a terminal's PATH. Include common CLI locations
   // without sourcing shell profiles or executing user startup scripts.

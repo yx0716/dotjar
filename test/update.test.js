@@ -147,3 +147,18 @@ test("managed supervisor performs a real service switch and rolls back a crashin
   assert.equal(fs.readFileSync(path.join(data, "web-token"), "utf8").trim(), token);
   assert.equal(fs.readFileSync(path.join(data, "precious-note.md"), "utf8"), "Keep me");
 });
+
+test("a pinned install fetches that release and verifies its signed version", async () => {
+  const f = fixture();
+  const requested = [];
+  const { latest } = require("../src/update/release");
+  const fetcher = async url => {
+    requested.push(url);
+    return new Response(JSON.stringify(url.includes("api.github.com") ? { tag_name: "v0.4.1", draft: false, prerelease: false } : f.sign(f.manifest)));
+  };
+  const envelope = await latest(f.keys, fetcher, "0.4.1");
+  assert.equal(envelope.manifest.version, "0.4.1");
+  assert.match(requested[0], /releases\/tags\/v0\.4\.1$/);
+  await assert.rejects(latest(f.keys, fetcher, "0.4.2"), /目标版本/);
+  await assert.rejects(latest(f.keys, fetcher, "latest"), /无效/);
+});

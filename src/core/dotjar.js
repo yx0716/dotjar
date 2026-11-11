@@ -15,6 +15,7 @@ const { distill } = require("./distill");
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 function collect(cfg, win, extra = {}) {
+  if (require("./instance").fixtures()) throw new Error("演示环境不读取真实记录");
   return collectDay({
     ...extra,
     window: win,

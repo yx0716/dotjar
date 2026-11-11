@@ -36,8 +36,9 @@ async function worker(id, version) {
     const pid = read(path.join(config.dataDir(), "web.pid"));
     if (!pid || !operations.alive(pid.pid)) throw new Error("请先启动托管版网页服务");
     const token = fs.readFileSync(path.join(config.dataDir(), "web-token"), "utf8").trim();
+    const cookie = `dotjar_token=${token}; ${require("../core/instance").current().cookie}=${token}`;
     const call = async (method, args = []) => {
-      const res = await fetch(`http://127.0.0.1:${pid.port}/api/${method}`, { method: "POST", headers: { "content-type": "application/json", "x-dotjar": "1", cookie: `dotjar_token=${token}` }, body: JSON.stringify({ args }), signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`http://127.0.0.1:${pid.port}/api/${method}`, { method: "POST", headers: { "content-type": "application/json", "x-dotjar": "1", cookie }, body: JSON.stringify({ args }), signal: AbortSignal.timeout(3000) });
       const body = await res.json();
       if (!body.ok) throw new Error(body.error || "服务未响应");
       return body.value;
@@ -85,7 +86,7 @@ async function worker(id, version) {
           try {
             const health = await call("updateHealth");
             if (health.version !== wanted || health.root !== base || health.dataDir !== config.dataDir() || health.schema !== 1) return false;
-            const asset = await fetch(`http://127.0.0.1:${pid.port}/overlay.js`, { headers: { cookie: `dotjar_token=${token}` }, signal: AbortSignal.timeout(3000) });
+            const asset = await fetch(`http://127.0.0.1:${pid.port}/overlay.js`, { headers: { cookie }, signal: AbortSignal.timeout(3000) });
             return asset.ok && (await asset.text()).includes("DotjarWords");
           } catch { return false; }
         }, 30000);
