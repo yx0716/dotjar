@@ -42,7 +42,7 @@ npx github:yx0716/dotjar demo
 
 ## 一边打捞，一边看
 
-开发分支已加入后台捕捞和逐条预览（尚未发布）：已有内容继续可看，完整生成的新卡片会逐颗出现。刷新网页可以接回原任务，不会重捞。新卡片标为「临时结果」，整轮完成后可收下；旧 CLI 不支持流式输出时，会等完整结果。详见[后台捕捞](docs/progressive-catches.md)。
+从 v0.4.3 起，捕捞在后台进行，可以一边捞一边看：已有内容继续可看，完整生成的新卡片会逐颗出现。刷新网页可以接回原任务，不会重捞。新卡片标为「临时结果」，整轮完成后可收下；旧 CLI 不支持流式输出时，会等完整结果。详见[后台捕捞](docs/progressive-catches.md)。
 
 ## 捕捞消耗
 
@@ -52,7 +52,7 @@ npx github:yx0716/dotjar demo
 
 macOS 双击安装包已提供测试构建：安装后在「应用程序」打开 dotjar，自带 Node.js，首次初始化无需联网下载程序。当前为**未公证测试版**，下载后可能需要在「系统设置 → 隐私与安全性」中手动允许打开；尚不作为免手动放行的正式分发。构建、测试及签名说明见 [macOS 安装包](docs/macos-installer.md)。
 
-下载 v0.4.2 测试安装包：[Apple 芯片](https://github.com/yx0716/dotjar/releases/download/v0.4.2/dotjar-0.4.2-macOS-arm64-unsigned-test.pkg) · [Intel](https://github.com/yx0716/dotjar/releases/download/v0.4.2/dotjar-0.4.2-macOS-x64-unsigned-test.pkg)。
+下载 v0.4.3 测试安装包：[Apple 芯片](https://github.com/yx0716/dotjar/releases/download/v0.4.3/dotjar-0.4.3-macOS-arm64-unsigned-test.pkg) · [Intel](https://github.com/yx0716/dotjar/releases/download/v0.4.3/dotjar-0.4.3-macOS-x64-unsigned-test.pkg)。
 
 从 v0.4.0 起支持签名更新包。托管安装从 GitHub 最新正式 Release 下载程序。
 
@@ -60,7 +60,7 @@ macOS + Node 20 或更新版本可使用托管安装。已有用户先停止旧�
 
 ```bash
 # 登录自启的旧版先运行 dotjar service uninstall；普通后台服务用 dotjar stop
-npx --yes github:yx0716/dotjar#v0.4.2 install-managed
+npx --yes github:yx0716/dotjar#v0.4.3 install-managed
 ```
 
 把 `~/.local/bin` 加入 PATH，以后使用这里的 `dotjar`。需要登录自启时重新运行 `dotjar service install`。原配置、对话台账和笔记保留；源码工作区不会被覆盖。旧版本没有这个命令，需要先手动取得带更新器的版本。
@@ -89,7 +89,7 @@ dotjar update status
 
 修改代码时运行 `npm run dev`：默认使用演示数据，每个工作树独立保存开发数据，可以和日常安装同时运行。
 
-`npm run verify:install -- --version 0.4.2 --candidate` 会通过 npx 测试当前安装器，并安装指定的签名发布包；不会卸载日常版。验收公开安装器、开启真实数据及模型调用的方法，见[开发与安装验收](docs/development.md)。
+`npm run verify:install -- --version 0.4.3 --candidate` 会通过 npx 测试当前安装器，并安装指定的签名发布包；不会卸载日常版。验收公开安装器、开启真实数据及模型调用的方法，见[开发与安装验收](docs/development.md)。
 
 ## 许可证
 

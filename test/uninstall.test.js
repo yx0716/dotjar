@@ -154,3 +154,35 @@ test("production: login item, administrator steps, Trash and notes kept outside 
   assert.ok(lines.some((s) => s.includes(notes) && s.includes("不会被删除")));
   assert.equal(fs.readFileSync(path.join(notes, "kept.md"), "utf8"), "outside\n");
 });
+
+test("uninstall through the managed entry stops its service and removes the installation it runs from", async (t) => {
+  const s = setup(t);
+  const version = require("../package.json").version;
+  const made = spawnSync(process.execPath, ["-e", `require("./src/update/install").bootstrap(${JSON.stringify(s.base)}, ${JSON.stringify(version)}, ${JSON.stringify(s.data)})`], { cwd: source, env: s.env, encoding: "utf8" });
+  assert.equal(made.status, 0, made.stderr);
+  // The release as a signed bundle would unpack it: this source, without .git.
+  const release = path.join(s.base, "releases", version);
+  for (const name of ["bin", "src", "assets", "package.json"]) fs.cpSync(path.join(source, name), path.join(release, name), { recursive: true });
+  const entry = path.join(s.entryDir, "dotjar");
+  write(entry, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(path.join(s.base, "launcher/bin/dotjar.js"))} "$@"\n`);
+  fs.chmodSync(entry, 0o755);
+  json(path.join(s.data, "config.json"), { rest: { enabled: false } });
+  write(path.join(s.data, "deposits/keep.md"), "a note that must survive\n");
+  const viaEntry = (...args) => spawnSync(entry, args, { env: s.env, encoding: "utf8", timeout: 30000 });
+  t.after(() => { // a failed run must not leave the managed service behind
+    try { const { pid } = JSON.parse(fs.readFileSync(path.join(s.data, "web.pid"), "utf8")); process.kill(pid, "SIGTERM"); } catch {}
+  });
+
+  const started = viaEntry("web", "--no-open", "--port", "0");
+  assert.equal(started.status, 0, started.stderr);
+  const { pid } = JSON.parse(fs.readFileSync(path.join(s.data, "web.pid"), "utf8"));
+  assert.ok(alive(pid));
+
+  const done = viaEntry("uninstall", "--yes", "--entry-dir", s.entryDir);
+  assert.equal(done.status, 0, done.stderr + done.stdout);
+  assert.match(done.stdout, new RegExp(`已停止后台服务（PID ${pid}）`));
+  assert.equal(alive(pid), false);
+  assert.equal(fs.existsSync(s.base), false);
+  assert.equal(fs.existsSync(entry), false);
+  assert.equal(fs.readFileSync(path.join(s.data, "deposits/keep.md"), "utf8"), "a note that must survive\n");
+});

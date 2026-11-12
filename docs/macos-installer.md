@@ -32,10 +32,10 @@
 需要 macOS 和 Xcode Command Line Tools。程序版本必须已经在 GitHub 发布签名附件；安装包构建会下载并验证该版本，不把未发布的源码当作内嵌程序。
 
 ```sh
-node scripts/package-macos.js --version=0.4.2 --arch=arm64
+node scripts/package-macos.js --version=0.4.3 --arch=arm64
 node scripts/smoke-macos.js dist/macos/arm64/dotjar.app
 # Intel 包可交叉构建；实际运行需在 Intel 或具备 Rosetta 的 Mac 上验证。
-node scripts/package-macos.js --version=0.4.2 --arch=x64
+node scripts/package-macos.js --version=0.4.3 --arch=x64
 ```
 
 产物在 `dist/macos/<arch>/`，含 `.pkg`、SHA-256 文件和供独立测试用的 `.app`。测试模式给应用做 ad-hoc 签名以支持 Apple 芯片执行，安装包仍无 Developer ID 签名/公证。CI 的 `macOS installer (test)` 工作流会构建两种架构并上传测试产物，该测试工作流不附加到稳定 Release；版本发布流水线会把明确标为 `unsigned-test` 的安装包附加到对应 Release；只有运行器架构匹配时执行运行测试。
@@ -52,7 +52,7 @@ Node 版本和两个架构的官方压缩包 SHA-256 固定在 `packaging/macos/
 export DOTJAR_APP_SIGN_ID='Developer ID Application: …'
 export DOTJAR_INSTALLER_SIGN_ID='Developer ID Installer: …'
 export DOTJAR_NOTARY_PROFILE='dotjar-notary'
-node scripts/package-macos.js --version=0.4.2 --arch=arm64 --signed
+node scripts/package-macos.js --version=0.4.3 --arch=arm64 --signed
 ```
 
 正式模式依次签署内嵌 Node 和应用（Hardened Runtime）、签署安装包、提交公证、附加公证票据并进行 Gatekeeper 检查。任何必需配置缺失或检查失败都会中止，不降级为测试包。当前没有开发者证书，**此流程尚未完成真实签名和公证验证**。

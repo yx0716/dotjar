@@ -11,7 +11,7 @@
 源码 clone/worktree 和旧 npm/npx 安装不会直接覆盖。首次迁移前先停止旧服务（登录自启用 `dotjar service uninstall`，否则用 `dotjar stop`），退出仍在写同一数据目录的旧桌面版本，然后运行带本更新器的新版本命令：
 
 ```sh
-npx --yes github:yx0716/dotjar#v0.4.2 install-managed
+npx --yes github:yx0716/dotjar#v0.4.3 install-managed
 ```
 
 旧 npx/npm 版本没有这个子命令，须先手动取得带更新器的版本。安装从 GitHub 最新正式 Release 下载签名包，写入 `~/.local/share/dotjar`，创建 `~/.local/bin/dotjar`；不会覆盖已有的同名命令。确保 `~/.local/bin` 在 PATH 中，以后用这里的 `dotjar`。自定义 `DOTJAR_HOME` 会记录为绝对路径，配置、授权和笔记仍在原处。需要登录自启时，迁移后重新运行 `dotjar service install`。
@@ -88,7 +88,7 @@ node scripts/release.js keygen
 
    也可以在仓库 Settings → Secrets and variables → Actions 中添加同名 Repository secret。私钥只能进入这个受控的 secret，不要粘贴到聊天、issue 或提交中。
 
-3. 确认发布版本未被使用，`package.json`、`package-lock.json` 的顶层版本及根包版本一致，并写好 `docs/release-notes.md`。在已合并且工作区干净的提交上创建并推送版本 tag；当前代码版本是 `0.4.2`，tag 必须和最终选定版本一致：
+3. 确认发布版本未被使用，`package.json`、`package-lock.json` 的顶层版本及根包版本一致，并写好 `docs/release-notes.md`。在已合并且工作区干净的提交上创建并推送版本 tag；当前代码版本是 `0.4.3`，tag 必须和最终选定版本一致：
 
    ```sh
    dotjarReleaseVersion=$(node -p 'require("./package.json").version')
