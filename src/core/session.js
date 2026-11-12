@@ -84,34 +84,45 @@ function createSession(options = {}) {
   }
 
   // Go through the day on screen, or several picked days one after another.
-  let progress = null; // { done, total, day } while a batch runs
+  let progress = null; // Active job, including complete provisional cards.
+  let lastJob = null;
+  const runDay = options.distillToday || dotjar.distillToday;
   function distill(days) {
     if (distilling) return distilling;
     const valid = (k) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
     const list = Array.isArray(days) && days.some(valid) ? [...new Set(days.filter(valid))].sort() : null;
+    progress = { id: require("crypto").randomUUID(), startedAt: Date.now(), status: "running", done: 0, total: list ? list.length : 1, day: list ? list[0] : lastScan ? lastScan.window.key : picked || null, preview: [], revision: 0 };
+    const job = progress;
+    lastJob = job;
+    const onProgress = (items) => { job.preview = items; job.revision++; };
     if (!list) {
-      progress = { done: 0, total: 1, day: lastScan ? lastScan.window.key : picked || null };
-      distilling = dotjar
-        .distillToday(cfg, { language, day: lastScan ? lastScan.window.key : picked })
+      distilling = runDay(cfg, { language, day: lastScan ? lastScan.window.key : picked, onProgress })
         .then(async (res) => ({ view: await today(), found: res.found, again: res.again, costUsd: res.costUsd, days: 1, failed: [] }));
     } else {
-      progress = { done: 0, total: list.length, day: list[0] };
       distilling = (async () => {
         let found = 0;
         const failed = [];
         for (const day of list) {
           progress.day = day;
+          progress.preview = []; progress.revision++;
           try {
-            found += (await dotjar.distillToday(cfg, { language, day })).found;
+            found += (await runDay(cfg, { language, day, onProgress })).found;
           } catch (err) {
             failed.push({ day, error: err.message, code: err.code });
           }
           progress.done++;
+          progress.preview = []; progress.revision++;
         }
         return { view: await today(), found, days: list.length, failed };
       })();
     }
-    distilling = distilling.finally(() => {
+    distilling = distilling.then((result) => {
+      job.status = "succeeded"; job.done = job.total; job.preview = []; job.result = result;
+      return result;
+    }, (error) => {
+      job.status = "failed"; job.error = error.message; job.code = error.code;
+      throw error;
+    }).finally(() => {
       distilling = null;
       progress = null;
     });
@@ -142,6 +153,17 @@ function createSession(options = {}) {
     distill,
     rest,
     usage: (day) => require("./runs").list(day || dayKey()),
+    startDistill(days) {
+      // Keep the writer registration alive for the entire background promise,
+      // not just for the HTTP request that accepts the job.
+      const task = require("./operations").run(() => distill(days));
+      task.catch(() => {}); // error is available through jobStatus, never unhandled
+      return { id: lastJob.id, startedAt: lastJob.startedAt };
+    },
+    jobStatus(id) {
+      if (!lastJob || (id && id !== lastJob.id)) return null;
+      return { ...lastJob, preview: [...lastJob.preview] };
+    },
     isDistilling: () => (progress ? { ...progress } : false),
     async calendar(month) {
       const now = new Date();

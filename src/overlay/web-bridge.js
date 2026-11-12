@@ -51,6 +51,8 @@
     distill: (days) => call("distill", days),
     calendar: (month) => call("calendar", month),
     usage: (day) => call("usage", day),
+    startDistill: (days) => call("startDistill", days),
+    jobStatus: (id) => call("jobStatus", id),
     distilling: () => call("distilling"),
     setEngine: (id) => call("setEngine", id),
     restart: () => call("restart"),

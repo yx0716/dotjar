@@ -102,7 +102,7 @@ test("an earlier day is named by its date, in sentences that still read right", 
   assert.equal(zh.tabToday, "10月12日");
   assert.equal(zh.overviewTitle(5), "10月12日做了 5 件事");
   assert.equal(zh.distill, "打捞 10月12日");
-  assert.equal(zh.distillingText("本地的 Codex"), "本地的 Codex 正在读 10月12日的记录，大概要半分钟到一分钟。");
+  assert.equal(zh.distillingText("本地的 Codex"), "本地的 Codex 正在读 10月12日的记录。完整的卡片生成后就会出现，已有内容可以继续看。");
   assert.equal(zh.overviewRough(6), "10月12日开了 6 段对话");
   assert.equal(en.tabToday, "Oct 12");
   assert.equal(en.overviewTitle(5), "5 things on Oct 12");

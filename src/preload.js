@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld("dotjarBridge", {
   distill: (days) => call("dotjar:distill", days),
   calendar: (month) => call("dotjar:calendar", month),
   usage: (day) => call("dotjar:usage", day),
+  startDistill: (days) => call("dotjar:start-distill", days),
+  jobStatus: (id) => call("dotjar:job-status", id),
   distilling: () => call("dotjar:distilling"),
   setEngine: (id) => call("dotjar:set-engine", id),
   rest: (beat) => call("dotjar:rest", beat),

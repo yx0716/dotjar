@@ -38,6 +38,10 @@ It can ask you to step away for a few minutes every so often. Off by default; yo
 
 Conversation records from Claude Code, Codex, Cursor, Gemini CLI, Qwen Code, opencode, OpenClaw and others are read locally. For a catch, excerpts containing your messages and each turn's closing reply are sent to your selected model service through the local `claude` or `codex` command, or a configured OpenAI-compatible endpoint. Break recaps read the local records without calling a model.
 
+## Read while a catch runs
+
+The development branch adds background catches and progressive previews (not yet released). Existing content stays available, and complete new cards appear as they arrive. Reloading reconnects to the same job. New cards are marked provisional until the final response is validated and saved. Older CLIs without streaming still wait for the full answer. See [behavior and limits](docs/progressive-catches.md) (Chinese).
+
 ## Catch usage
 
 Starting with v0.4.2, dotjar records individual runs. Click the latest consumption in the footer to see runs for the selected material date, including model, duration and outcome. Claude provides an estimated cost; Codex and compatible endpoints provide token counts when available. Missing data is shown as unavailable. Estimates are not extra subscription charges or plan percentages. Failed runs and retries retain separate records; older runs are not reconstructed. See [accounting details](docs/usage.md) (Chinese).

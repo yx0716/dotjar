@@ -3,9 +3,11 @@
   const say = (zh, cn, en) => zh ? cn : en;
   function consumption(record, zh = true) {
     const u = record?.usage;
-    if (u?.estimatedUsd != null) return say(zh, `参考费用约 $${u.estimatedUsd.toFixed(4)}`, `Estimated cost $${u.estimatedUsd.toFixed(4)}`);
-    if (u?.total != null) return `${u.total.toLocaleString(zh ? "zh-CN" : "en-US")} tokens`;
-    return say(zh, "消耗暂不可获取", "Usage unavailable");
+    let value;
+    if (u?.estimatedUsd != null) value = say(zh, `参考费用约 $${u.estimatedUsd.toFixed(4)}`, `Estimated cost $${u.estimatedUsd.toFixed(4)}`);
+    else if (u?.total != null) value = `${u.total.toLocaleString(zh ? "zh-CN" : "en-US")} tokens`;
+    else return say(zh, "消耗暂不可获取", "Usage unavailable");
+    return value + (record.usageComplete === false ? say(zh, "（统计不完整）", " (partial)") : "");
   }
   const names = {
     running: ["进行中", "Running"], succeeded: ["完成", "Completed"],
@@ -54,7 +56,7 @@
           for (const [key, cn, en] of [["input", "输入", "Input"], ["output", "输出", "Output"], ["cached", "其中缓存读取", "Cached input subset"], ["written", "其中缓存写入", "Cache write subset"], ["reasoning", "其中推理", "Reasoning output subset"]]) {
             if (u?.[key] != null) details.push(`${text(cn, en)} ${u[key].toLocaleString()}`);
           }
-          if (u?.total == null || ["running", "interrupted"].includes(r.status)) details.push(text("用量统计不完整", "Usage accounting incomplete"));
+          if (u?.total == null || r.usageComplete === false || ["running", "interrupted"].includes(r.status)) details.push(text("用量统计不完整", "Usage accounting incomplete"));
           row.append(node("p", details.join(" · "), "update-muted"));
           content.append(row);
         }
