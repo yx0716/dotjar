@@ -129,6 +129,18 @@ async function main(args = process.argv.slice(2)) {
     assert.equal(fs.readFileSync(path.join(data, "deposits/keep.md"), "utf8"), "installation verification note\n");
     assert.equal(read(path.join(data, "config.json")).rest.enabled, false);
     report.checks.push("notes and settings preserved");
+    // Installers that have it: uninstall stops the service, removes the program
+    // and entry, and keeps records and notes. Run through npx like a customer.
+    if (/^  uninstall /m.test(help)) {
+      console.log("正在验证卸载…");
+      await run("npx", [...npxArgs, "uninstall", "--yes", "--entry-dir", entryDir]);
+      stopped = true;
+      await assert.rejects(fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }));
+      assert.equal(fs.existsSync(base), false); assert.equal(fs.existsSync(entry), false);
+      assert.equal(fs.readFileSync(path.join(data, "deposits/keep.md"), "utf8"), "installation verification note\n");
+      assert.equal(read(path.join(data, "config.json")).rest.enabled, false);
+      report.checks.push("uninstall stops the service and removes program and entry, keeping notes and settings");
+    }
     assert.deepEqual(fingerprint(), before); report.checks.push("production entry, pointers, PID, config and login item unchanged");
     passed = true;
   } catch (err) { report.error = err.message; throw err; }

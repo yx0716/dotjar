@@ -63,5 +63,12 @@ function assertModel() {
   if (profile() !== "production" && (fixtures() || process.env.DOTJAR_ALLOW_MODEL !== "1")) throw new Error("此环境未启用模型调用；开发时需同时指定 --real-data --allow-model");
 }
 function assertInstall() { if (profile() === "dev") throw new Error("开发版不安装或更新客户程序，请使用 npm run dev"); }
+// A source checkout must opt into a data context of its own. Otherwise a plain
+// `npm start` or `electron .` would quietly act as the customer's copy.
+function assertIsolatedSource(source) {
+  if (fs.existsSync(path.join(source, ".git")) && !process.env.DOTJAR_PROFILE && !process.env.DOTJAR_HOME && !process.env.STRATA_HOME) {
+    throw new Error("这是开发源码，请用 npm run dev 启动隔离环境；客户版请使用已安装的 dotjar 入口");
+  }
+}
 function assertService() { if (profile() !== "production") throw new Error("开发/验收环境不操作系统登录启动项"); }
-module.exports = { canonical, defaultDataDir, profile, dataDir, current, inside, assertWrite, fixtures, assertModel, assertInstall, assertService };
+module.exports = { canonical, defaultDataDir, profile, dataDir, current, inside, assertWrite, fixtures, assertModel, assertInstall, assertService, assertIsolatedSource };
