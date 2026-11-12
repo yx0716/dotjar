@@ -16,6 +16,7 @@ const { spawn, spawnSync } = require("child_process");
 const config = require("./core/config");
 const server = require("./server");
 
+const instance = require("./core/instance");
 const LABEL = "com.dotjar.web";
 const BIN = process.env.DOTJAR_LAUNCHER || path.join(__dirname, "..", "bin", "dotjar.js");
 
@@ -32,10 +33,10 @@ function logFile() {
 function writePid(port) {
   fs.mkdirSync(config.dataDir(), { recursive: true });
   const startupId = process.env.DOTJAR_STARTUP_ID;
-  fs.writeFileSync(pidFile(), JSON.stringify({ pid: process.pid, port, ...(startupId ? { startupId } : {}) }));
+  fs.writeFileSync(pidFile(), JSON.stringify({ pid: process.pid, port, instance: instance.current(), ...(startupId ? { startupId } : {}) }));
   // Where this dotjar lives, so a desktop companion can start it again later.
   try {
-    fs.writeFileSync(path.join(config.dataDir(), "install.json"), JSON.stringify({ bin: BIN, port }));
+    fs.writeFileSync(path.join(config.dataDir(), "install.json"), JSON.stringify({ bin: BIN, port, instance: instance.current() }));
   } catch {
     // only a convenience
   }
@@ -72,7 +73,8 @@ async function running() {
   const known = readPid();
   if (known && alive(known.pid)) {
     const found = await server.find({ port: known.port, span: 1 });
-    if (found) return { ...found, pid: known.pid };
+    if (found && found.pid === known.pid) return { ...found, pid: known.pid };
+    throw new Error("后台进程身份与记录不符，请用原安装入口处理；未停止任何进程");
   }
   return server.find({});
 }
@@ -111,10 +113,12 @@ async function startInBackground(options = {}) {
 async function stop() {
   const known = readPid();
   if (!known || !alive(known.pid)) return false;
+  const found = await running();
+  if (!found || found.pid !== known.pid) throw new Error("无法核实后台进程身份，未停止任何进程");
   process.kill(known.pid, "SIGTERM");
   for (let waited = 0; waited < 4000 && alive(known.pid); waited += 100) await sleep(100);
   try {
-    fs.unlinkSync(pidFile());
+    if (readPid()?.pid === known.pid) fs.unlinkSync(pidFile());
   } catch {
     // the server removed it on its way out
   }
@@ -123,8 +127,11 @@ async function stop() {
 
 // ----------------------------------------------------------------- launchd
 
+function label() {
+  return config.dataDir() === instance.defaultDataDir() ? LABEL : `${LABEL}.${instance.current().id}`;
+}
 function plistPath() {
-  return path.join(os.homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
+  return path.join(os.homedir(), "Library", "LaunchAgents", `${label()}.plist`);
 }
 
 function xml(text) {
@@ -142,7 +149,7 @@ function plistXml(options = {}) {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>${LABEL}</string>
+  <key>Label</key><string>${label()}</string>
   <key>ProgramArguments</key>
   <array>
 ${args.map((a) => `    <string>${xml(a)}</string>`).join("\n")}
@@ -164,7 +171,10 @@ ${Object.entries(env)
 }
 
 function installed() {
-  return process.platform === "darwin" && fs.existsSync(plistPath());
+  if (instance.profile() !== "production" || process.platform !== "darwin" || !fs.existsSync(plistPath())) return false;
+  const text = fs.readFileSync(plistPath(), "utf8");
+  if (!text.includes(`<string>${xml(BIN)}</string>`)) throw new Error("登录启动项属于另一份程序，请通过原安装入口管理");
+  return true;
 }
 
 function launchctl(...args) {
@@ -173,6 +183,9 @@ function launchctl(...args) {
 
 // Hand the server to launchd: started at login, restarted if it stops.
 async function install() {
+  instance.assertService();
+  installed(); // refuse to replace another installation
+
   if (process.platform !== "darwin") throw new Error("开机自启目前只做了 macOS。其他系统请把 `node bin/dotjar.js web --foreground --no-open` 加进自己的启动项。");
   const savedPort = readPid()?.port;
   await stop(); // a copy started by hand would hold the port
@@ -180,7 +193,7 @@ async function install() {
   fs.mkdirSync(config.dataDir(), { recursive: true });
   fs.writeFileSync(plistPath(), plistXml({ port: savedPort }));
   const domain = `gui/${process.getuid()}`;
-  launchctl("bootout", `${domain}/${LABEL}`); // replace an earlier install; fine if there was none
+  launchctl("bootout", `${domain}/${label()}`); // replace an earlier install; fine if there was none
   const res = launchctl("bootstrap", domain, plistPath());
   if (res.status !== 0) throw new Error(`launchctl 没装上：${(res.stderr || res.stdout || "").trim()}`);
   for (let waited = 0; waited < 8000; waited += 200) {
@@ -193,7 +206,9 @@ async function install() {
 
 // Have launchd stop the server and start it again straight away.
 function kickstart() {
-  launchctl("kickstart", "-k", `gui/${process.getuid()}/${LABEL}`);
+  instance.assertService();
+  if (!installed()) throw new Error("没有属于当前程序的登录启动项");
+  launchctl("kickstart", "-k", `gui/${process.getuid()}/${label()}`);
 }
 
 // A server already running, replaced first if its code is older than the
@@ -218,8 +233,9 @@ async function current() {
 }
 
 function uninstall() {
+  instance.assertService();
   if (!installed()) return false;
-  launchctl("bootout", `gui/${process.getuid()}/${LABEL}`);
+  launchctl("bootout", `gui/${process.getuid()}/${label()}`);
   fs.unlinkSync(plistPath());
   return true;
 }

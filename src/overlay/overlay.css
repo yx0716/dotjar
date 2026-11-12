@@ -2315,3 +2315,6 @@ button.growth-content:hover span {
 .arriving-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin: 12px auto; max-width: 900px; font: 14px/1.6 var(--sans); color: var(--muted); }
 .arriving-cards button { color: var(--ink); }
 .btn:disabled { opacity: .5; cursor: default; }
+
+/* Always visible, including the fixture-only development page. */
+.instance-badge { position: fixed; z-index: 10000; bottom: 8px; left: 12px; max-width: 70vw; padding: 4px 10px; border-radius: 8px; background: #563b12; color: #fff1c2; font: 12px system-ui; pointer-events: none; }

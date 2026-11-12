@@ -655,6 +655,7 @@ function fail(message, code) {
 }
 
 async function distill({ config, cwd, dayKey, digest, settled, kept, pending, skipped, language, signal, run, onProgress }) {
+  require("./instance").assertModel();
   const prompt = buildPrompt({ dayKey, digest, settled, kept, pending, skipped, language });
   const engine = resolveEngine(config);
   const record = runs.start(dayKey, engine, engine === "openai" ? config.api?.model : engine === "codex-cli" ? config.codexModel : config.model);

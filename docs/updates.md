@@ -11,7 +11,7 @@
 源码 clone/worktree 和旧 npm/npx 安装不会直接覆盖。首次迁移前先停止旧服务（登录自启用 `dotjar service uninstall`，否则用 `dotjar stop`），退出仍在写同一数据目录的旧桌面版本，然后运行带本更新器的新版本命令：
 
 ```sh
-node bin/dotjar.js install-managed
+npx --yes github:yx0716/dotjar#v0.4.2 install-managed
 ```
 
 旧 npx/npm 版本没有这个子命令，须先手动取得带更新器的版本。安装从 GitHub 最新正式 Release 下载签名包，写入 `~/.local/share/dotjar`，创建 `~/.local/bin/dotjar`；不会覆盖已有的同名命令。确保 `~/.local/bin` 在 PATH 中，以后用这里的 `dotjar`。自定义 `DOTJAR_HOME` 会记录为绝对路径，配置、授权和笔记仍在原处。需要登录自启时，迁移后重新运行 `dotjar service install`。

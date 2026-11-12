@@ -51,6 +51,7 @@ function preferences(patch) {
   return status();
 }
 async function start(version) {
+  require("../core/instance").assertInstall();
   const install = installation();
   if (install.mode !== "managed" || process.platform !== "darwin") throw new Error("此安装由你管理，请先运行 dotjar install-managed 迁移到托管版");
   const envelope = read(stateFile(), {}).envelope;
@@ -75,6 +76,7 @@ async function start(version) {
   throw new Error("更新进程没有回应，请稍后查看更新状态");
 }
 function watch() {
+  if (require("../core/instance").profile() !== "production") return () => {};
   const tick = () => {
     const saved = read(stateFile(), {});
     if (saved.autoCheck && Date.now() - (Date.parse(saved.checkedAt) || 0) >= 86400000) check().catch(() => {});

@@ -201,6 +201,7 @@ function createSession(options = {}) {
     setDepositDir(dir) {
       const target = config.expandHome(String(dir || "").trim());
       if (!target || !path.isAbsolute(target)) throw new Error("请填写完整的文件夹路径，例如 ~/笔记/收件箱");
+      require("./instance").assertWrite(target);
       fs.mkdirSync(target, { recursive: true });
       cfg = config.save({ depositDir: target });
       rebuildLibrary();
@@ -217,6 +218,7 @@ function createSession(options = {}) {
     // candidate counts as passed over; something an agent wrote is only no
     // longer listed, its file untouched. Returns what puts it back.
     removeFromLibrary(file) {
+      require("./instance").assertWrite(file);
       if (typeof file !== "string" || !path.isAbsolute(file)) throw new Error("没有这个条目");
       const kept = ledger.findKept(file);
       const inStore = path.dirname(file) === config.depositDir(cfg) && /\.(md|markdown)$/i.test(file);
@@ -233,6 +235,7 @@ function createSession(options = {}) {
     },
 
     restoreToLibrary(undo) {
+      if (undo?.file) require("./instance").assertWrite(undo.file);
       if (!undo || typeof undo.file !== "string") throw new Error("没有可撤销的");
       if (undo.hidden) {
         ledger.setHidden(undo.file, false);

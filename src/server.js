@@ -18,6 +18,7 @@ const operations = require("./core/operations");
 
 const DEFAULT_PORT = 4747;
 const COOKIE = "dotjar_token";
+const instance = require("./core/instance");
 const BODY_LIMIT = 2 * 1024 * 1024;
 const OVERLAY = path.join(__dirname, "overlay");
 
@@ -148,7 +149,7 @@ function createApi(session, options = {}) {
       const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-health-"));
       try { fs.writeFileSync(path.join(scratch, "probe"), "ok", { flag: "wx" }); }
       finally { fs.rmSync(scratch, { recursive: true, force: true }); }
-      return { version: require("../package.json").version, root: process.env.DOTJAR_MANAGED_ROOT || null, dataDir: config.dataDir(), schema: 1 };
+      return { instance: instance.current(), pid: process.pid, version: require("../package.json").version, root: process.env.DOTJAR_MANAGED_ROOT || null, dataDir: config.dataDir(), schema: 1 };
     },
     updateStop: (id) => {
       const gate = operations.read(operations.gateFile());
@@ -158,6 +159,7 @@ function createApi(session, options = {}) {
       return true;
     },
     meta: () => ({
+      instance: instance.current(),
       demo: false,
       web: true,
       // The files changed after this server started: the page offers a restart.
@@ -201,6 +203,7 @@ function createApi(session, options = {}) {
     removeFromLibrary: (file) => session.removeFromLibrary(file),
     restoreToLibrary: (undo) => session.restoreToLibrary(undo),
     restart: () => {
+      if (instance.profile() === "dev") throw new Error("开发版请在终端按 Ctrl+C 后重新运行 npm run dev");
       if (!options.restartable) throw new Error("这个服务不能从页面重启");
       if (session.isDistilling()) throw new Error("正在整理，整理完再重启");
       setTimeout(options.restart, 80); // answer first, then go
@@ -220,6 +223,8 @@ function createServer(options = {}) {
   let httpServer = null;
   const restWindow = options.restWindow || createRestWindow();
   const token = options.token || loadToken();
+  const identity = instance.current();
+  const cookieName = identity.cookie;
   const onRestDue = (status) => {
     const address = httpServer && httpServer.address();
     if (!address) return;
@@ -258,17 +263,22 @@ function createServer(options = {}) {
         url.searchParams.delete("t");
         return send(res, 302, "text/plain", "", {
           location: url.pathname + url.search,
-          "set-cookie": `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`,
+          "set-cookie": `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`,
         });
       }
-      if (!sameToken(cookieOf(req, COOKIE), token)) {
+      if (!sameToken(cookieOf(req, cookieName), token)) {
         return send(res, 403, "text/html; charset=utf-8", "<!doctype html><meta charset=utf-8><title>dotjar</title><p style=\"font:16px system-ui;margin:3em\">这个页面要从 dotjar 打开：在终端再运行一次 dotjar，它会用带授权的地址打开这一页。<br>Open this page from dotjar: run dotjar again in a terminal and it opens this page with its token.</p>");
       }
 
       if (req.method === "GET" || req.method === "HEAD") {
         if (url.pathname === "/") {
-          const html = fs.readFileSync(path.join(OVERLAY, "overlay.html"), "utf8").replace("</head>", '  <link rel="icon" href="/icon.png" />\n  </head>');
-          return send(res, 200, "text/html; charset=utf-8", html, { "x-dotjar": "1", "x-dotjar-code": String(LOADED) });
+          let html = fs.readFileSync(path.join(OVERLAY, "overlay.html"), "utf8").replace("</head>", '  <link rel="icon" href="/icon.png" />\n  </head>');
+          if (identity.profile !== "production") {
+            const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+            const label = identity.profile === "dev" ? "开发版" : "安装验收";
+            html = html.replace("<body>", `<body><aside class="instance-badge">${label} · ${escape(process.env.DOTJAR_DEV_BRANCH || identity.id.slice(0, 8))}${instance.fixtures() ? " · 演示数据" : " · 真实记录"}</aside>`);
+          }
+          return send(res, 200, "text/html; charset=utf-8", html, { "x-dotjar": "1", "x-dotjar-code": String(LOADED), "x-dotjar-instance": identity.id, "x-dotjar-owner": identity.owner, "x-dotjar-pid": String(process.pid) });
         }
         if (url.pathname === "/library") return send(res, 200, "text/html; charset=utf-8", fs.readFileSync(session.library()));
         if (url.pathname === "/icon.png") return send(res, 200, "image/png", fs.readFileSync(path.join(__dirname, "..", "assets", "icon.png")));
@@ -283,6 +293,7 @@ function createServer(options = {}) {
         // server never grants, so a form on another page cannot reach here.
         const origin = req.headers.origin;
         if (req.headers["x-dotjar"] !== "1" || (origin && origin !== `http://${host}`)) return send(res, 403, "application/json", JSON.stringify({ ok: false, error: "forbidden" }));
+        if (instance.fixtures() && !["meta", "updateHealth", "updateReady", "updateStatus", "updateCheck", "updatePreferences", "updateInstall", "updateStop"].includes(url.pathname.slice(5))) throw new Error("演示环境不读取真实记录或调用模型，请使用 --real-data 显式开启");
         const fn = api[url.pathname.slice(5)];
         if (!fn || !Object.prototype.hasOwnProperty.call(api, url.pathname.slice(5))) return send(res, 404, "application/json", JSON.stringify({ ok: false, error: "没有这个操作" }));
         let args = [];
@@ -354,9 +365,13 @@ function relaunch(httpServer) {
 // If so, when the code it runs last changed.
 function isOurs(port, token) {
   return new Promise((resolve) => {
-    const req = http.get({ host: "127.0.0.1", port, path: "/", headers: { cookie: `${COOKIE}=${token}` }, timeout: 1500 }, (res) => {
+    const req = http.get({ host: "127.0.0.1", port, path: "/", headers: { cookie: `${instance.current().cookie}=${token}` }, timeout: 1500 }, (res) => {
       res.resume();
-      resolve(res.headers["x-dotjar"] === "1" ? { code: Number(res.headers["x-dotjar-code"]) || 0 } : false);
+      if (res.headers["x-dotjar"] !== "1") return resolve(false);
+      const identity = instance.current();
+      resolve({ code: Number(res.headers["x-dotjar-code"]) || 0,
+        pid: Number(res.headers["x-dotjar-pid"]),
+        mismatch: res.headers["x-dotjar-instance"] !== identity.id || res.headers["x-dotjar-owner"] !== identity.owner });
     });
     req.on("error", () => resolve(false));
     req.on("timeout", () => {
@@ -382,10 +397,12 @@ async function start(options = {}) {
     const server = createServer({ token, restartable: options.restartable, watchRest: options.watchRest });
     try {
       const bound = await listen(server, port);
-      return { server, port: bound, url: `http://127.0.0.1:${bound}/?t=${token}`, reused: false };
+      return { server, port: bound, url: `http://127.0.0.1:${bound}/?t=${token}${instance.fixtures() ? "&demo=1" : ""}`, reused: false };
     } catch (err) {
       if (err.code !== "EADDRINUSE" || process.env.DOTJAR_MANAGED_ROOT) throw err;
-      if (await isOurs(port, token)) return { server: null, port, url: `http://127.0.0.1:${port}/?t=${token}`, reused: true };
+      const existing = await isOurs(port, token);
+      if (existing?.mismatch) throw new Error("这个数据目录正由另一份程序或旧版服务使用，请从原入口停止它");
+      if (existing) return { server: null, port, url: `http://127.0.0.1:${port}/?t=${token}`, reused: true };
     }
   }
   throw new Error(`${wanted} 到 ${wanted + 9} 的端口都被占用了，用 --port 指定一个`);
@@ -397,7 +414,8 @@ async function find(options = {}) {
   const wanted = Number(options.port) || DEFAULT_PORT;
   for (let port = wanted; port < wanted + (options.span || 10); port++) {
     const ours = await isOurs(port, token);
-    if (ours) return { port, url: `http://127.0.0.1:${port}/?t=${token}`, code: ours.code };
+    if (ours?.mismatch) throw new Error("这个数据目录正由另一份程序或旧版服务使用，请从原入口停止它");
+    if (ours) return { port, url: `http://127.0.0.1:${port}/?t=${token}${instance.fixtures() ? "&demo=1" : ""}`, code: ours.code, pid: ours.pid };
   }
   return null;
 }

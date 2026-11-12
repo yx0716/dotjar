@@ -83,6 +83,12 @@ dotjar update status
 
 快捷键、配置项、命令行、从源码运行和已知的边界，见[使用说明](docs/guide.md)。
 
+## 开发与安装验收
+
+修改代码时运行 `npm run dev`：默认使用演示数据，每个工作树独立保存开发数据，可以和日常安装同时运行。
+
+`npm run verify:install -- --version 0.4.2 --candidate` 会通过 npx 测试当前安装器，并安装指定的签名发布包；不会卸载日常版。验收公开安装器、开启真实数据及模型调用的方法，见[开发与安装验收](docs/development.md)。
+
 ## 许可证
 
 MIT

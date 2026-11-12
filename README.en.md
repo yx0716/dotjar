@@ -83,6 +83,12 @@ The crab in [clawd-insights](https://github.com/yx0716/clawd-insights) fishes fo
 
 Keys, settings, the command line, running from source and known limits are in the [guide](docs/guide.en.md).
 
+## Development and installation checks
+
+Use `npm run dev` when working on the code. It uses demo data by default and gives each worktree its own state, alongside your regular installation.
+
+Run `npm run verify:install -- --version 0.4.2 --candidate` to exercise the current installer through npx with a real signed release. This does not uninstall your regular copy. See [development and installation checks](docs/development.md) (Chinese) for testing the published installer or explicitly enabling real records and model calls.
+
 ## License
 
 MIT

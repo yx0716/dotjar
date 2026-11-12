@@ -7,15 +7,8 @@ const { spawnSync } = require("child_process");
 
 const HOME = os.homedir();
 
-function dataDir() {
-  // DOTJAR_HOME wins; STRATA_HOME is its old name. Otherwise ~/.dotjar,
-  // unless only the old ~/.strata is there, which is then used as it is.
-  const named = process.env.DOTJAR_HOME || process.env.STRATA_HOME;
-  if (named) return named;
-  const fresh = path.join(HOME, ".dotjar");
-  const old = path.join(HOME, ".strata");
-  return !fs.existsSync(fresh) && fs.existsSync(old) ? old : fresh;
-}
+const instance = require("./instance");
+const dataDir = instance.dataDir;
 
 const DEFAULTS = Object.freeze({
   // Global shortcut that lowers and lifts the veil.
@@ -77,6 +70,10 @@ function load() {
   cfg.api = { ...DEFAULTS.api, ...(cfg.api && typeof cfg.api === "object" ? cfg.api : {}) };
   cfg.rest = { ...DEFAULTS.rest, ...(cfg.rest && typeof cfg.rest === "object" ? cfg.rest : {}) };
   if (!["auto", "claude-cli", "codex-cli", "openai"].includes(cfg.engine)) cfg.engine = "auto";
+  if (instance.profile() !== "production") {
+    instance.assertWrite(cfg.depositDir ? expandHome(cfg.depositDir) : path.join(dataDir(), "deposits"));
+    if (instance.fixtures()) cfg.rest = { ...cfg.rest, enabled: false };
+  }
   return cfg;
 }
 
@@ -89,6 +86,7 @@ function writeJsonAtomic(file, value) {
 
 // Persist only the keys that differ from defaults, so new defaults keep applying.
 function save(patch) {
+  if (patch?.depositDir) instance.assertWrite(expandHome(patch.depositDir));
   let stored = {};
   try {
     stored = JSON.parse(fs.readFileSync(configPath(), "utf8")) || {};
@@ -134,7 +132,9 @@ function resolveLanguage(cfg, hint) {
 }
 
 function depositDir(cfg) {
-  return cfg.depositDir ? expandHome(cfg.depositDir) : path.join(dataDir(), "deposits");
+  const dir = cfg.depositDir ? expandHome(cfg.depositDir) : path.join(dataDir(), "deposits");
+  instance.assertWrite(dir);
+  return dir;
 }
 
 function expandHome(p) {

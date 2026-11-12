@@ -78,7 +78,7 @@ dotjar service install
 
 Do this once and it starts at login from then on, so all you do is open the bookmark. Undo it with `dotjar service uninstall`. (It can be set up through `npx` too, but then it points into npx's cache and stops working when the cache is cleared.)
 
-Running from source is the same: clone the repository and `npm start`, with `npm run stop`, `npm run service` and `npm run service:off` to match. When dotjar's code is updated, the bottom of the page says the server behind it is still the old one; click “Restart it” to switch. Starting it again switches too.
+For source development, use `npm run dev`. It runs in the foreground with separate data and an automatically assigned port; press Ctrl+C to stop it. Demo data is the default. See [development and installation checks](development.md) (Chinese) for enabling real records, model calls or installer verification. Development instances do not register login services.
 
 Why it isn't a plain page you can double-click: it has to read the agents' records on your machine and write notes into a folder. A page in a browser can do neither on its own, so a small server listening only on this machine (`127.0.0.1`) sits behind it.
 
@@ -194,7 +194,7 @@ All interface text is in `src/overlay/words.js`.
 
 ## Command line
 
-Everything also works without the interface, which is handy for checking what it saw and what it would send (from a clone, use `node bin/dotjar.js` in place of `dotjar`):
+The installed version also works without the interface, which is handy for checking what it saw and what it would send. Source debugging requires an explicit isolated environment; see [development and installation checks](development.md):
 
 ```bash
 dotjar scan

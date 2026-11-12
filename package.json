@@ -31,7 +31,9 @@
     "library": "node bin/dotjar.js library",
     "test": "node --test",
     "shot": "electron . --demo --shot",
-    "icon": "electron scripts/make-icon.js"
+    "icon": "electron scripts/make-icon.js",
+    "dev": "node scripts/dev.js",
+    "verify:install": "node scripts/verify-install.js"
   },
   "engines": {
     "node": ">=20"
