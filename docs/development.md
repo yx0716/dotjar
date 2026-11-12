@@ -70,7 +70,7 @@ PID、日志、配置、反馈台账、消耗记录和更新锁随数据目录�
 新增的安装器支持：
 
 ```sh
-dotjar install-managed --version 0.4.2 --entry-dir /指定的命令目录
+dotjar install-managed --version 0.4.3 --entry-dir /指定的命令目录
 ```
 
 `--version` 固定实际下载的签名发布包，而不只是 npx 安装器的源码版本。省略时仍下载最新稳定版；`--entry-dir` 省略时仍使用 `~/.local/bin`，不会覆盖已有命令。
@@ -78,7 +78,7 @@ dotjar install-managed --version 0.4.2 --entry-dir /指定的命令目录
 在 macOS 源码目录执行：
 
 ```sh
-npm run verify:install -- --version 0.4.2 --candidate
+npm run verify:install -- --version 0.4.3 --candidate
 ```
 
 `--candidate` 将当前源码用 `npm pack` 打包，再通过 npx 调用它的安装入口，安装并校验指定的真实 GitHub 签名发布包。这验证的是「本次安装器 + 已发布程序」，不能当作当前源码已发布的证明。
@@ -88,7 +88,7 @@ npm run verify:install -- --version 0.4.2 --candidate
 验证两个已发布版本之间的更新：
 
 ```sh
-npm run verify:install -- --version 0.4.2 --from 0.4.1 --candidate
+npm run verify:install -- --version 0.4.3 --from 0.4.2 --candidate
 ```
 
 需要代理才能访问 GitHub 时，照常设置 `HTTPS_PROXY` 或打开系统代理（见[安装与更新](updates.md)）。`--candidate` 的安装器和它写入的稳定启动器都来自当前源码，安装与升级下载都走代理。

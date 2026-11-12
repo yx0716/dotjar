@@ -42,7 +42,7 @@ Conversation records from Claude Code, Codex, Cursor, Gemini CLI, Qwen Code, ope
 
 ## Read while a catch runs
 
-The development branch adds background catches and progressive previews (not yet released). Existing content stays available, and complete new cards appear as they arrive. Reloading reconnects to the same job. New cards are marked provisional until the final response is validated and saved. Older CLIs without streaming still wait for the full answer. See [behavior and limits](docs/progressive-catches.md) (Chinese).
+Starting with v0.4.3, catches run in the background so you can keep reading. Existing content stays available, and complete new cards appear as they arrive. Reloading reconnects to the same job. New cards are marked provisional until the final response is validated and saved. Older CLIs without streaming still wait for the full answer. See [behavior and limits](docs/progressive-catches.md) (Chinese).
 
 ## Catch usage
 
@@ -52,7 +52,7 @@ Starting with v0.4.2, dotjar records individual runs. Click the latest consumpti
 
 A macOS double-click installer is available as a test build. Open dotjar from Applications after installation; Node.js is bundled and first-time setup uses an embedded release without downloading it. This is currently an **unnotarized test build** and macOS may require a manual allowance in Privacy & Security. It is not yet a signed, notarized public distribution. See [macOS installer](docs/macos-installer.md) (Chinese) for building, testing and signing.
 
-Download v0.4.2 test installers: [Apple Silicon](https://github.com/yx0716/dotjar/releases/download/v0.4.2/dotjar-0.4.2-macOS-arm64-unsigned-test.pkg) · [Intel](https://github.com/yx0716/dotjar/releases/download/v0.4.2/dotjar-0.4.2-macOS-x64-unsigned-test.pkg).
+Download v0.4.3 test installers: [Apple Silicon](https://github.com/yx0716/dotjar/releases/download/v0.4.3/dotjar-0.4.3-macOS-arm64-unsigned-test.pkg) · [Intel](https://github.com/yx0716/dotjar/releases/download/v0.4.3/dotjar-0.4.3-macOS-x64-unsigned-test.pkg).
 
 Signed update packages are supported from v0.4.0. Managed installation downloads the latest stable GitHub Release.
 
@@ -60,7 +60,7 @@ Managed installation supports macOS with Node 20 or newer. Existing users should
 
 ```bash
 # Use dotjar service uninstall for a login service, otherwise dotjar stop
-npx --yes github:yx0716/dotjar#v0.4.2 install-managed
+npx --yes github:yx0716/dotjar#v0.4.3 install-managed
 ```
 
 Add `~/.local/bin` to PATH and use its `dotjar` command from then on. Run `dotjar service install` again if you want login startup. Existing settings, ledgers and notes stay in place; source checkouts are never overwritten. Older versions without this command need a one-time manual upgrade first.
@@ -89,7 +89,7 @@ Keys, settings, the command line, running from source and known limits are in th
 
 Use `npm run dev` when working on the code. It uses demo data by default and gives each worktree its own state, alongside your regular installation.
 
-Run `npm run verify:install -- --version 0.4.2 --candidate` to exercise the current installer through npx with a real signed release. This does not uninstall your regular copy. See [development and installation checks](docs/development.md) (Chinese) for testing the published installer or explicitly enabling real records and model calls.
+Run `npm run verify:install -- --version 0.4.3 --candidate` to exercise the current installer through npx with a real signed release. This does not uninstall your regular copy. See [development and installation checks](docs/development.md) (Chinese) for testing the published installer or explicitly enabling real records and model calls.
 
 ## License
 
