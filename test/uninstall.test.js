@@ -177,6 +177,13 @@ test("uninstall through the managed entry stops its service and removes the inst
   assert.equal(started.status, 0, started.stderr);
   const { pid } = JSON.parse(fs.readFileSync(path.join(s.data, "web.pid"), "utf8"));
   assert.ok(alive(pid));
+  // Hints name the installed entry, not the release file or how tests were started.
+  assert.match(started.stdout, /停掉：dotjar stop/);
+  assert.doesNotMatch(started.stdout, /node bin\/dotjar\.js|npm run|npx /);
+  const preview = viaEntry("uninstall", "--entry-dir", s.entryDir);
+  assert.equal(preview.status, 1);
+  assert.match(preview.stderr, /确认无误后运行：dotjar uninstall --entry-dir \S+ --yes/);
+  assert.ok(alive(pid) && fs.existsSync(s.base), "a preview changes nothing");
 
   const done = viaEntry("uninstall", "--yes", "--entry-dir", s.entryDir);
   assert.equal(done.status, 0, done.stderr + done.stdout);
