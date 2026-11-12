@@ -77,17 +77,20 @@ send({method:'turn/completed',params:{threadId:'t',turn:{id:'r',status:'complete
 
 test("Codex app-server exposes deltas before completion and never enables retry after turn/start", async () => {
   const cli = fakeCodex("ok");
-  let preview, done = false;
-  const job = runCodexStream({ codexPath: cli.file, cwd: cli.dir, prompt: "test", onText: (text) => { preview = partialItems(text); }, timeoutMs: 2000 }).then((r) => { done = true; return r; });
-  for (let i = 0; i < 80 && !preview; i++) await sleep(10);
-  assert.equal(done, false); assert.equal(preview.length, 1);
+  // Record the order when the first delta arrives, not by polling: under a
+  // busy test run a timer can wake after both the delta and the completion.
+  // The timeouts only bound a hung child; they are generous so a slow start
+  // under parallel test load is not mistaken for one.
+  let first, done = false;
+  const job = runCodexStream({ codexPath: cli.file, cwd: cli.dir, prompt: "test", onText: (text) => { first ||= { items: partialItems(text), beforeDone: !done }; }, timeoutMs: 20000 }).then((r) => { done = true; return r; });
   const result = await job;
+  assert.equal(first.beforeDone, true); assert.equal(first.items.length, 1);
   assert.equal(result.model, "actual-model"); assert.equal(result.text, answer); assert.equal(result.usage.total, 120);
   const old = fakeCodex("unsupported");
-  await assert.rejects(runCodexStream({ codexPath: old.file, cwd: old.dir, prompt: "test", timeoutMs: 2000 }), (e) => e.code === "NO_STREAM");
+  await assert.rejects(runCodexStream({ codexPath: old.file, cwd: old.dir, prompt: "test", timeoutMs: 20000 }), (e) => e.code === "NO_STREAM");
   assert.equal(fs.existsSync(path.join(old.dir, "started")), false);
   const broken = fakeCodex("disconnect");
-  await assert.rejects(runCodexStream({ codexPath: broken.file, cwd: broken.dir, prompt: "test", timeoutMs: 2000 }), (e) => e.code !== "NO_STREAM");
+  await assert.rejects(runCodexStream({ codexPath: broken.file, cwd: broken.dir, prompt: "test", timeoutMs: 20000 }), (e) => e.code !== "NO_STREAM");
   for (const c of [cli, old, broken]) fs.rmSync(c.dir, { recursive: true, force: true });
 });
 

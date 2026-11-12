@@ -39,6 +39,10 @@ const viaNpx = process.env.npm_lifecycle_event === "npx" || process.env.npm_comm
 
 function again(sub) {
   const env = process.env;
+  // Run by the managed launcher (the installed `dotjar`, the app, or the first
+  // start from install-managed): the command to type is the installed entry,
+  // not the release file the launcher happens to run.
+  if (env.DOTJAR_MANAGED_ROOT) return `dotjar${sub ? ` ${sub}` : ""}`;
   if (viaNpx) return `npx github:yx0716/dotjar${sub ? ` ${sub}` : ""}`;
   if (env.npm_lifecycle_event) return { "": "npm start", stop: "npm run stop", "service install": "npm run service", "service uninstall": "npm run service:off" }[sub] || `npm run ${sub}`;
   return `${/\.js$/.test(process.argv[1] || "") ? "node bin/dotjar.js" : "dotjar"}${sub ? ` ${sub}` : ""}`;
