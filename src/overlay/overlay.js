@@ -41,6 +41,8 @@
   const params = new URLSearchParams(location.search);
   const growthStore = window.DotjarGrowth.createStore(() => window.localStorage, `dotjar.growth.read.v1${!host || host.demo ? ".demo" : ""}`);
   let growthExpandedDay = null;
+  let growthMoreDay = null;
+  let overviewPage = { day: null, index: 0 };
   let growthBusy = false;
   const nativeRest = params.has("nativeRest") && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dotjarRest;
   const tellRestWindow = (message) => { if (nativeRest) nativeRest.postMessage(message); };
@@ -613,6 +615,16 @@
       if (v.turnsSince) foot += ` <button class="btn" type="button" data-act="distill">${esc(T.refreshNew(v.turnsSince))} <kbd>R</kbd></button>`;
     }
     const growth = renderGrowth(v);
+    if (overviewPage.day !== v.day) overviewPage = { day: v.day, index: 0 };
+    const stageStyle = getComputedStyle(el.stage);
+    const availableWidth = el.stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight);
+    const page = window.DotjarOverview.page(v.tasks, v.dots || [], overviewPage.index, availableWidth < 760 ? 3 : 6);
+    overviewPage.index = page.current;
+    const paging = page.pages > 1 ? `<nav class="overview-pages" aria-label="${esc(T.overviewPages)}">
+      <button class="link" type="button" data-act="overviewPrev" ${page.current === 0 ? "disabled" : ""}>${esc(T.overviewPrev)}</button>
+      <span>${esc(T.overviewPage(page.current + 1, page.pages))}</span>
+      <button class="link" type="button" data-act="overviewNext" ${page.current === page.pages - 1 ? "disabled" : ""}>${esc(T.overviewNext)}</button>
+    </nav>` : "";
     const fresh = candidates().filter((item) => item.preview);
     const arrivingCards = fresh.length ? `<div class="arriving-cards"><span>${esc(T.previewLabel)}</span>${fresh.map((item) => `<button class="link" type="button" data-act="preview" data-preview-id="${esc(item.id)}">✦ ${esc(item.title)}</button>`).join("")}</div>` : "";
     el.stage.innerHTML = `
@@ -621,13 +633,16 @@
         <h2 class="overview-title">${esc(title)}</h2>
         ${growth}
         ${arrivingCards}
-        <p class="overview-key">${key}</p>
+        <div class="overview-guide"><span>${esc(T.overviewHint)}</span>
+          <details class="overview-legend"><summary>${esc(T.overviewLegend)}</summary><div class="overview-key">${key}</div></details>
+        </div>
+        ${paging}
         <div class="flow"></div>
         <div class="overview-foot">${foot}</div>
       </section>`;
     // The stars come in from the top when the page is shown or what is drawn
     // changes, not on every redraw.
-    const drawn = `${v.day}|${v.tasks.length}|${(v.dots || []).map((d) => d.id + d.status).join()}`;
+    const drawn = `${v.day}|${page.current}|${v.tasks.length}|${(v.dots || []).map((d) => d.id + d.status).join()}`;
     const arriving = drawn !== lastDrawn;
     lastDrawn = drawn;
     // The river takes the height the rest of the view leaves it.
@@ -636,7 +651,7 @@
     const room = el.stage.clientHeight - parseFloat(box.paddingTop) - parseFloat(box.paddingBottom) - overview.scrollHeight;
     const flow = overview.querySelector(".flow");
     const wide = flow.clientWidth >= 760;
-    drawGalaxy(flow, v.tasks, v.activity, v.dots || [], arriving, Math.min(wide ? 500 : 600, Math.max(wide ? 380 : 300, room - 4)));
+    drawGalaxy(flow, page.tasks, v.activity, page.dots, arriving, Math.min(wide ? 500 : 600, Math.max(wide ? 380 : 300, room - 4)));
   }
 
   function renderGrowth(v) {
@@ -644,10 +659,12 @@
     if (!rows.length) return "";
     const expanded = growthExpandedDay === v.day;
     const count = rows.filter((row) => growthStore.has(v.day, row.key)).length;
+    const more = growthMoreDay === v.day;
+    const selection = window.DotjarOverview.feedback(rows, (row) => growthStore.has(v.day, row.key), more);
     const colon = T.lang === "zh" ? "：" : ": ";
     return `<div class="growth">${rows.map((row, i) => {
       const read = growthStore.has(v.day, row.key);
-      if (read && !expanded) return "";
+      if (read ? !expanded : !selection.visible.has(i)) return "";
       const label = { good: T.growthGood, applied: T.growthUsed, next: T.growthNext }[row.kind];
       const text = row.kind === "applied" ? T.growthUsedText(row.title) + (row.text ? colon + row.text : "") : row.text;
       const body = `<b>${esc(label)}</b><span>${esc(text)}</span>`;
@@ -655,7 +672,7 @@
         <input class="growth-check" type="checkbox" data-growth-read="${i}" ${read ? "checked" : ""} ${growthBusy ? "disabled" : ""} aria-label="${esc((read ? T.growthUnread : T.growthRead) + colon + text)}" title="${esc(T.growthReadHint)}">
         ${row.kind === "applied" ? `<button class="growth-content" type="button" data-act="applied" data-n="${row.n}">${body}</button>` : `<div class="growth-content">${body}</div>`}
       </div>`;
-    }).join("")}${count ? `<button class="growth-toggle link" type="button" data-act="growthToggle" aria-expanded="${expanded}">${esc(expanded ? T.growthCollapse : T.growthHidden(count))}</button>` : ""}</div>`;
+    }).join("")}<div class="growth-controls">${selection.hidden || more ? `<button class="growth-toggle link" type="button" data-act="growthMore" aria-expanded="${more}">${esc(more ? T.growthLess : T.growthMore(selection.hidden))}</button>` : ""}${count ? `<button class="growth-toggle link" type="button" data-act="growthToggle" aria-expanded="${expanded}">${esc(expanded ? T.growthCollapse : T.growthHidden(count))}</button>` : ""}</div></div>`;
   }
 
   // Small sparks lift out of the words, then leave the sky quiet again.
@@ -731,6 +748,59 @@
   function hhmmOf(minutes) {
     const v = Math.round(minutes) % 1440;
     return `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
+  }
+
+  function overviewTaskLabel(p, side) {
+    const t = p.t;
+    const when = t?.from ? (t.to && t.to !== t.from ? `${t.from}–${t.to}` : t.from) : "";
+    const title = t ? t.title : T.overviewLoose;
+    const index = t ? t.overviewIndex : -1;
+    const count = p.dots.filter((d) => d.status !== "skipped").length;
+    return `<div class="flow-item is-${side}"><button class="flow-task" type="button" data-act="task" data-index="${index}" aria-haspopup="dialog">
+      ${when ? `<span class="flow-time">${esc(when)}</span>` : ""}
+      <span class="flow-title">${esc(title)}</span>
+      <span class="flow-count">${esc(T.overviewStars(count))}<span aria-hidden="true"> ›</span></span>
+    </button></div>`;
+  }
+
+  function openTask(index) {
+    const v = state.view;
+    const task = v.tasks[index];
+    if (index !== -1 && !task) return;
+    const dots = (v.dots || []).filter((d) => index === -1 ? !window.DotjarOverview.belongs(d, v.tasks) : d.task === index);
+    const focus = document.activeElement;
+    const dialog = document.createElement("dialog");
+    dialog.className = "update-dialog task-dialog";
+    dialog.setAttribute("aria-labelledby", "task-detail-title");
+    const when = task?.from ? [task.from, task.to !== task.from ? task.to : null].filter(Boolean).join("–") : "";
+    const meta = task ? [when, task.project, Number.isFinite(task.asks) ? T.asks(task.asks) : null].filter(Boolean).join(" · ") : T.dotsLoose(dots.length);
+    const details = task?.share ? [[T.you, task.human, "you"], [T.ai, task.ai, "ai"], [T.doubt, task.doubt, "doubt"]]
+      .filter(([, text]) => text).map(([label, text, kind]) => `<p class="task-detail-line"><b class="who is-${kind}">${esc(label)}</b><span>${esc(text)}</span></p>`).join("") : "";
+    dialog.innerHTML = `<button class="update-action update-close" type="button" data-task-close>${esc(T.overviewClose)}</button>
+      <p class="task-meta">${esc(meta)}</p><h2 id="task-detail-title">${esc(task ? task.title : T.overviewLoose)}</h2>
+      ${details}<h3>${esc(T.overviewRelated)}</h3>
+      ${dots.length ? `<ul class="task-stars">${dots.map((d) => {
+        const actionable = d.status === "open" || (d.status === "kept" && d.file);
+        const content = `<span class="task-star-kind" data-kind="${esc(d.kind)}">✦ ${esc(T.kinds[d.kind] || d.kind)}</span><span>${esc(d.title)}</span><span class="task-star-status">${esc(d.status === "open" ? T.tabOpen : d.status === "kept" ? T.tabDone : T.overviewSkipped)}</span>`;
+        return `<li>${actionable ? `<button type="button" data-task-dot="${esc(d.id)}">${content}</button>` : `<div>${content}</div>`}</li>`;
+      }).join("")}</ul>` : `<p class="task-meta">${esc(T.overviewNoStars)}</p>`}`;
+    dialog.addEventListener("click", (event) => {
+      if (event.target.closest("[data-task-close]")) dialog.close();
+      const dot = event.target.closest("[data-task-dot]");
+      if (dot) { dialog.close(); openDot(dot.dataset.taskDot); }
+    });
+    dialog.addEventListener("keydown", (event) => event.stopPropagation());
+    dialog.addEventListener("close", () => { dialog.remove(); if (focus?.isConnected) focus.focus(); });
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+
+  function turnOverview(delta) {
+    overviewPage.index += delta;
+    renderOverview(state.view);
+    const target = el.stage.querySelector(`[data-act="${delta > 0 ? "overviewNext" : "overviewPrev"}"]:not(:disabled)`)
+      || el.stage.querySelector(".overview-pages button:not(:disabled)");
+    target?.focus({ preventScroll: true });
   }
 
   // Wide windows: the galaxy belongs to the whole sky, with time flowing
@@ -893,20 +963,7 @@
     clusters.forEach((c, n) => {
       const { p } = c;
       const side = n % 2 === 0 ? "up" : "down";
-      let html;
-      if (!p.t) {
-        html = `<div class="flow-item is-${side}"><p class="flow-line is-count"><span>${esc(T.dotsLoose(p.dots.length))}</span></p></div>`;
-      } else {
-        const t = p.t;
-        const when = t.from ? (t.to && t.to !== t.from ? `${t.from}–${t.to}` : t.from) : "";
-        const where = [t.project, T.asks(t.asks || 0)].filter(Boolean).join(T.lang === "zh" ? "，" : ", ");
-        const body = t.share
-          ? `<p class="flow-line"><b class="who is-you">${esc(T.you)}</b><span>${esc(t.human)}</span></p>
-             <p class="flow-line"><b class="who is-ai">${esc(T.ai)}</b><span>${esc(t.ai)}</span></p>` +
-            (t.doubt ? `<p class="flow-line"><b class="who is-doubt">${esc(T.doubt)}</b><span>${esc(t.doubt)}</span></p>` : "")
-          : `<p class="flow-line is-count"><span>${esc(where)}</span></p>`;
-        html = `<div class="flow-item is-${side}">${when ? `<p class="flow-time">${esc(when)}</p>` : ""}<p class="flow-title">${esc(t.title)}</p>${body}</div>`;
-      }
+      const html = overviewTaskLabel(p, side);
       const next = clusters[n + 2];
       const width = Math.max(140, Math.min(220, next ? next.x - c.x - 18 : labelWidth));
       cards.push({ side, x: c.x + 12, width, html });
@@ -998,7 +1055,7 @@
     // Side by side, a label only has to clear the one two back. In a short
     // window the tasks draw closer together before the river grows longer.
     const tail = 92; // room for the last one's words
-    const gap = narrow ? 112 : Math.min(72, Math.max(58, (H - pad - tail) / Math.max(1, placed.length - 1)));
+    const gap = narrow ? 140 : Math.min(72, Math.max(58, (H - pad - tail) / Math.max(1, placed.length - 1)));
     let last = -Infinity;
     placed.forEach((p, n) => {
       const want = p.at != null ? pad + ((p.at - t0) / (t1 - t0)) * (H - 2 * pad) : p.t ? pad + (n + 0.5) * ((H - 2 * pad) / placed.length) : H - pad;
@@ -1104,20 +1161,7 @@
       const room = Math.max(c.reach + 14, widest + 12);
       const end = side === "right" ? c.x + room : c.x - room;
       ties.push(`<line class="tie" x1="${f(side === "right" ? c.x + c.reach : c.x - c.reach)}" y1="${f(p.y)}" x2="${f(end)}" y2="${f(p.y)}"/>`);
-      let html;
-      if (!p.t) {
-        html = `<div class="flow-item is-${side}"><p class="flow-line is-count"><span>${esc(T.dotsLoose(p.dots.length))}</span></p></div>`;
-      } else {
-        const t = p.t;
-        const when = t.from ? (t.to && t.to !== t.from ? `${t.from}–${t.to}` : t.from) : "";
-        const where = [t.project, T.asks(t.asks || 0)].filter(Boolean).join(T.lang === "zh" ? "，" : ", ");
-        const body = t.share
-          ? `<p class="flow-line"><b class="who is-you">${esc(T.you)}</b><span>${esc(t.human)}</span></p>
-             <p class="flow-line"><b class="who is-ai">${esc(T.ai)}</b><span>${esc(t.ai)}</span></p>` +
-            (t.doubt ? `<p class="flow-line"><b class="who is-doubt">${esc(T.doubt)}</b><span>${esc(t.doubt)}</span></p>` : "")
-          : `<p class="flow-line is-count"><span>${esc(where)}</span></p>`;
-        html = `<div class="flow-item is-${side}">${when ? `<p class="flow-time">${esc(when)}</p>` : ""}<p class="flow-title">${esc(t.title)}</p>${body}</div>`;
-      }
+      const html = overviewTaskLabel(p, side);
       cards.push({ side, x: end, y: p.y, html });
     });
 
@@ -2214,6 +2258,13 @@
   }
 
   const actions = {
+    overviewPrev: () => turnOverview(-1),
+    overviewNext: () => turnOverview(1),
+    growthMore: () => {
+      growthMoreDay = growthMoreDay === state.view.day ? null : state.view.day;
+      renderOverview(state.view);
+      el.stage.querySelector('[data-act="growthMore"]')?.focus({ preventScroll: true });
+    },
     growthToggle: () => {
       growthExpandedDay = growthExpandedDay === state.view.day ? null : state.view.day;
       renderOverview(state.view);
@@ -2247,6 +2298,7 @@
 
   document.addEventListener("click", (e) => {
     const act = e.target.closest("[data-act]");
+    if (act && act.dataset.act === "task") return void openTask(Number(act.dataset.index));
     if (act && act.dataset.act === "preview") return void actions.preview(act.dataset.previewId);
     if (act && act.dataset.act === "dot") return void openDot(act.dataset.id);
     if (act && act.dataset.act === "applied") return void openApplied(Number(act.dataset.n));
