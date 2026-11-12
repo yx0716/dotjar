@@ -12,6 +12,9 @@ const { activate, recover, waitFor } = require("../src/update/transaction");
 const { atomic, read, newer, REPO } = require("../src/update/common");
 const ops = require("../src/core/operations");
 const { bootstrap } = require("../src/update/install");
+const net = require("../src/update/net");
+const http = require("http");
+const https = require("https");
 const source = path.resolve(__dirname, "..");
 function temp(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dotjar-update-test-")); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir; }
 function fixture(extra = []) {
@@ -46,10 +49,123 @@ test("downloads reject private redirects, HTTP errors, and oversized responses",
   await download("https://api.github.com/repos/yx0716/dotjar/releases/latest", 20, async (_url, options) => {
     assert.equal(options.headers.Accept, "application/vnd.github+json");
     return new Response("{}");
+  }, () => null);
+  await assert.rejects(download("https://github.com/x", 10, async () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1/secret" } }), () => null), /不受信任/);
+  await assert.rejects(download("https://github.com/x", 10, async () => new Response("404", { status: 404 }), () => null), /正式更新包/);
+  await assert.rejects(download("https://github.com/x", 3, async () => new Response("too large"), () => null), /大小限制/);
+});
+const direct = () => null;
+async function listen(t, server) {
+  const sockets = new Set();
+  server.on("connection", (s) => { sockets.add(s); s.on("close", () => sockets.delete(s)); });
+  server.on("secureConnection", (s) => { sockets.add(s); s.on("close", () => sockets.delete(s)); });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  t.after(() => { for (const s of sockets) s.destroy(); server.close(); });
+  return server.address().port;
+}
+// A CONNECT proxy that forwards every tunnel to `origin` (a local stand-in for
+// GitHub), or answers `refuse` without tunnelling.
+async function fakeProxy(t, { origin, refuse } = {}) {
+  const seen = [], proxy = http.createServer((req, res) => { res.writeHead(405); res.end(); });
+  proxy.on("connect", (req, client, head) => {
+    seen.push({ target: req.url, auth: req.headers["proxy-authorization"] || "" });
+    client.on("error", () => {});
+    if (refuse || !origin) { client.end(`HTTP/1.1 ${refuse || 502} No\r\n\r\n`); return; }
+    const upstream = require("net").connect(origin, "127.0.0.1", () => { client.write("HTTP/1.1 200 Connection Established\r\n\r\n"); upstream.write(head); upstream.pipe(client); client.pipe(upstream); });
+    upstream.on("error", () => client.destroy()); client.on("close", () => upstream.destroy());
   });
-  await assert.rejects(download("https://github.com/x", 10, async () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1/secret" } })), /不受信任/);
-  await assert.rejects(download("https://github.com/x", 10, async () => new Response("404", { status: 404 })), /正式更新包/);
-  await assert.rejects(download("https://github.com/x", 3, async () => new Response("too large")), /大小限制/);
+  return { port: await listen(t, proxy), seen };
+}
+function certificate(t) {
+  const dir = temp(t), key = path.join(dir, "key.pem"), cert = path.join(dir, "cert.pem");
+  const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "2", "-subj", "/CN=github.com", "-addext", "subjectAltName=DNS:github.com,DNS:objects.githubusercontent.com"], { encoding: "utf8" });
+  return made.status === 0 ? { key: fs.readFileSync(key), cert: fs.readFileSync(cert) } : null;
+}
+test("release downloads use https_proxy/HTTPS_PROXY, then the macOS system proxy, and honour NO_PROXY", () => {
+  const system = () => ({ url: "http://127.0.0.1:7897", exceptions: ["*.local", "<local>", "api.github.com"] });
+  const pick = (env, sys = direct, url = "https://github.com/") => { const p = net.proxyFor(new URL(url), env, sys); return p && `${p.url.host} ${p.source}`; };
+  assert.equal(pick({}), null);
+  assert.equal(pick({ HTTPS_PROXY: "http://127.0.0.1:7890" }), "127.0.0.1:7890 HTTPS_PROXY");
+  assert.equal(pick({ https_proxy: "127.0.0.1:7891", HTTPS_PROXY: "http://127.0.0.1:7890" }), "127.0.0.1:7891 https_proxy");
+  assert.equal(pick({ HTTP_PROXY: "http://127.0.0.1:7890" }), null);
+  assert.equal(pick({}, system), "127.0.0.1:7897 macOS 系统代理");
+  assert.equal(pick({ HTTPS_PROXY: "http://127.0.0.1:7890" }, system), "127.0.0.1:7890 HTTPS_PROXY");
+  assert.equal(pick({}, system, "https://api.github.com/repos"), null);
+  const proxied = { HTTPS_PROXY: "http://127.0.0.1:7890" };
+  assert.equal(pick({ ...proxied, NO_PROXY: "localhost, github.com" }, direct, "https://api.github.com/x"), null);
+  assert.equal(pick({ ...proxied, no_proxy: "*.githubusercontent.com" }, direct, "https://objects.githubusercontent.com/x"), null);
+  assert.equal(pick({ ...proxied, NO_PROXY: "github.com" }, direct, "https://objects.githubusercontent.com/x"), "127.0.0.1:7890 HTTPS_PROXY");
+  assert.equal(pick({ ...proxied, NO_PROXY: "github.com:8443,10.0.0.0/8,.local" }), "127.0.0.1:7890 HTTPS_PROXY");
+  assert.equal(pick({ NO_PROXY: "*" }, system), null);
+  assert.throws(() => pick({ HTTPS_PROXY: "socks5://me:secret@127.0.0.1:7891" }), (e) => /socks5/.test(e.message) && !e.message.includes("secret"));
+  const scutil = `<dictionary> {\n  ExceptionsList : <array> {\n    0 : 127.0.0.1\n    1 : *.local\n  }\n  HTTPEnable : 1\n  HTTPPort : 7897\n  HTTPProxy : 127.0.0.1\n  HTTPSEnable : 1\n  HTTPSPort : 7897\n  HTTPSProxy : 127.0.0.1\n  ProxyAutoConfigEnable : 0\n}\n`;
+  assert.deepEqual(net.scutil(scutil), { url: "http://127.0.0.1:7897", exceptions: ["127.0.0.1", "*.local"] });
+  assert.equal(net.scutil(scutil.replace("HTTPSEnable : 1", "HTTPSEnable : 0")), null);
+  assert.equal(net.scutil(scutil.replace("HTTPSProxy : 127.0.0.1", "HTTPSProxy : ::1")).url, "http://[::1]:7897");
+  assert.equal(net.scutil("<dictionary> {\n}"), null);
+});
+test("downloads tunnel through an HTTP proxy with end-to-end TLS and keep the redirect and size checks", async (t) => {
+  const pair = certificate(t);
+  if (!pair) return t.skip("openssl is not available to make a stand-in certificate");
+  const origin = await listen(t, https.createServer(pair, (req, res) => {
+    if (req.headers.host === "github.com" && req.url === "/yx0716/dotjar/releases/download/v1/asset") { res.writeHead(302, { location: "https://objects.githubusercontent.com/blob?sig=1" }); res.end(); }
+    else if (req.headers.host === "objects.githubusercontent.com" && req.url === "/blob?sig=1") res.end("signed bytes");
+    else if (req.url === "/stream") { res.write("x".repeat(50)); res.end("x".repeat(50)); }
+    else if (req.url === "/private") { res.writeHead(302, { location: "http://127.0.0.1/secret" }); res.end(); }
+    else { res.writeHead(404); res.end(); }
+  }));
+  const { port, seen } = await fakeProxy(t, { origin });
+  const route = (u) => net.proxyFor(u, { HTTPS_PROXY: `http://dotjar:p%40ss@127.0.0.1:${port}` }, direct);
+  const trusted = (u, init) => net.request(u, { ...init, ca: pair.cert });
+  assert.equal((await download("https://github.com/yx0716/dotjar/releases/download/v1/asset", 1024, trusted, route)).toString(), "signed bytes");
+  assert.deepEqual(seen.map((s) => s.target), ["github.com:443", "objects.githubusercontent.com:443"]);
+  assert.equal(Buffer.from(seen[0].auth.replace(/^Basic /, ""), "base64").toString(), "dotjar:p@ss");
+  await assert.rejects(download("https://github.com/stream", 60, trusted, route), /大小限制/);
+  await assert.rejects(download("https://github.com/missing", 60, trusted, route), /正式更新包/);
+  seen.length = 0;
+  await assert.rejects(download("https://github.com/private", 60, trusted, route), /不受信任/);
+  assert.deepEqual(seen.map((s) => s.target), ["github.com:443"]);
+  // Without the stand-in's certificate the proxy cannot pose as GitHub. The
+  // platform fetch, even passed explicitly, is swapped for the proxy route.
+  const platform = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error("platform fetch bypassed the proxy"); };
+  try {
+    await assert.rejects(download("https://github.com/yx0716/dotjar/releases/download/v1/asset", 1024, globalThis.fetch, route), (e) => /无法连接 github\.com（经代理 127\.0\.0\.1:\d+，来自 HTTPS_PROXY；[A-Z_]*(CERT|SIGNED)/.test(e.message));
+  } finally { globalThis.fetch = platform; }
+});
+test("network failures name the host, the cause and the route instead of a bare fetch failed", async (t) => {
+  const reset = Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }) });
+  const plain = await download("https://github.com/x", 10, async () => { throw reset; }, direct).catch((e) => e);
+  assert.match(plain.message, /^无法连接 github\.com（直连；ECONNRESET）/);
+  assert.match(plain.message, /HTTPS_PROXY/);
+  assert.equal(plain.cause, reset);
+  const cut = new ReadableStream({ start(c) { c.enqueue(new Uint8Array([1])); c.error(Object.assign(new TypeError("terminated"), { cause: Object.assign(new Error("other side closed"), { code: "UND_ERR_SOCKET" }) })); } });
+  assert.match((await download("https://objects.githubusercontent.com/x", 10, async () => new Response(cut), direct).catch((e) => e)).message, /objects\.githubusercontent\.com（直连；UND_ERR_SOCKET）/);
+  const reservation = require("net").createServer();
+  await new Promise((r) => reservation.listen(0, "127.0.0.1", r)); const closed = reservation.address().port; await new Promise((r) => reservation.close(r));
+  const dead = await download("https://api.github.com/repos/x", 10, undefined, (u) => net.proxyFor(u, { https_proxy: `http://127.0.0.1:${closed}` }, direct)).catch((e) => e);
+  assert.match(dead.message, new RegExp(`api\\.github\\.com（经代理 127\\.0\\.0\\.1:${closed}，来自 https_proxy；ECONNREFUSED）`));
+  const { port } = await fakeProxy(t, { refuse: 407 });
+  const refused = await download("https://github.com/x", 10, undefined, (u) => net.proxyFor(u, {}, () => ({ url: `http://127.0.0.1:${port}`, exceptions: [] }))).catch((e) => e);
+  assert.match(refused.message, /来自 macOS 系统代理；代理拒绝转发，HTTP 407/);
+});
+test("a worker from an older launcher gets Node's own proxy switch while local calls stay direct", async (t) => {
+  const system = () => ({ url: "http://127.0.0.1:7897", exceptions: [] });
+  assert.deepEqual(net.workerEnv({}, direct), {});
+  assert.deepEqual(net.workerEnv({ NO_PROXY: "*" }, system), {});
+  assert.deepEqual(net.workerEnv({ HTTPS_PROXY: "socks5://127.0.0.1:1" }, system), {});
+  const env = net.workerEnv({ no_proxy: "corp.example" }, system);
+  assert.deepEqual(env, { https_proxy: "http://127.0.0.1:7897/", HTTPS_PROXY: "http://127.0.0.1:7897/", no_proxy: "corp.example,localhost,127.0.0.1,::1", NO_PROXY: "corp.example,localhost,127.0.0.1,::1", NODE_USE_ENV_PROXY: "1" });
+  const [major, minor] = process.versions.node.split(".").map(Number);
+  if (!(major >= 24 || (major === 22 && minor >= 21))) return t.skip("this Node has no NODE_USE_ENV_PROXY");
+  const { port, seen } = await fakeProxy(t, { refuse: 502 });
+  const local = await listen(t, http.createServer((req, res) => res.end("local")));
+  const script = `Promise.all([fetch("https://dotjar.invalid/").then(() => "reached", () => "stopped"), fetch("http://127.0.0.1:${local}/").then((r) => r.text())]).then((v) => console.log(JSON.stringify(v)))`;
+  const child = spawn(process.execPath, ["-e", script], { env: { PATH: process.env.PATH, ...net.workerEnv({}, () => ({ url: `http://127.0.0.1:${port}`, exceptions: [] })) }, stdio: ["ignore", "pipe", "ignore"] });
+  let out = ""; child.stdout.on("data", (b) => out += b);
+  await new Promise((r) => child.once("exit", r));
+  assert.deepEqual(JSON.parse(out), ["stopped", "local"]);
+  assert.deepEqual(seen.map((s) => s.target), ["dotjar.invalid:443"]);
 });
 test("the update gate waits for existing work and excludes new CLI and nested writes", async (t) => {
   const dir = temp(t), before = process.env.DOTJAR_HOME;

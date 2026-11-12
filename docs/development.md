@@ -91,6 +91,8 @@ npm run verify:install -- --version 0.4.2 --candidate
 npm run verify:install -- --version 0.4.2 --from 0.4.1 --candidate
 ```
 
+需要代理才能访问 GitHub 时，照常设置 `HTTPS_PROXY` 或打开系统代理（见[安装与更新](updates.md)）。`--candidate` 的安装器和它写入的稳定启动器都来自当前源码，安装与升级下载都走代理。
+
 脚本不改 HOME，不注册登录启动项。每次创建独立的数据、程序、命令目录和 npm 缓存，依次验证：
 
 1. npx 安装成功退出，健康检查确认版本、安装位置和数据位置。

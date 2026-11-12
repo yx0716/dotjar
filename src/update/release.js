@@ -4,6 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 const zlib = require("zlib");
 const { REPO, VERSION } = require("./common");
+const net = require("./net");
 const MAX_PACKAGE = 64 * 1024 * 1024;
 const MAX_UNPACKED = 160 * 1024 * 1024;
 function allowedUrl(url) {
@@ -11,10 +12,18 @@ function allowedUrl(url) {
   if (u.protocol !== "https:" || u.username || u.password || u.port || !["api.github.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com"].includes(u.hostname)) throw new Error("更新下载地址不受信任");
   return u;
 }
-async function download(url, limit, fetcher = fetch) {
+// `fetcher` is a test seam. The platform fetch ignores proxy settings, so it
+// is replaced by the proxy-aware transport, also when a caller passes it.
+// Every hop is re-checked against the allowlist before it is requested.
+async function download(url, limit, fetcher = fetch, route = net.proxyFor) {
+  const send = fetcher === globalThis.fetch ? net.request : fetcher;
   for (let i = 0; i < 5; i++) {
     const address = allowedUrl(url);
-    const response = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(60000), headers: { "User-Agent": "dotjar-updater", Accept: address.hostname === "api.github.com" ? "application/vnd.github+json" : "application/octet-stream" } });
+    const proxy = route(address);
+    const signal = AbortSignal.timeout(60000);
+    let response;
+    try { response = await send(url, { redirect: "manual", signal, proxy, headers: { "User-Agent": "dotjar-updater", Accept: address.hostname === "api.github.com" ? "application/vnd.github+json" : "application/octet-stream" } }); }
+    catch (err) { throw net.failure(err, address, proxy, signal); }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
       url = new URL(response.headers.get("location"), url).href;
@@ -22,12 +31,15 @@ async function download(url, limit, fetcher = fetch) {
     }
     if (!response.ok) throw new Error(response.status === 404 ? "还没有可用的正式更新包" : `更新服务返回 ${response.status}`);
     if (Number(response.headers.get("content-length")) > limit) { await response.body?.cancel(); throw new Error("更新文件超过大小限制"); }
-    const chunks = []; let size = 0;
-    for await (const chunk of response.body) {
-      size += chunk.length;
-      if (size > limit) { throw new Error("更新文件超过大小限制"); }
-      chunks.push(chunk);
-    }
+    const chunks = []; let size = 0, over = false;
+    try {
+      for await (const chunk of response.body) {
+        size += chunk.length;
+        if (size > limit) { over = true; break; }
+        chunks.push(chunk);
+      }
+    } catch (err) { throw net.failure(err, address, proxy, signal); }
+    if (over) throw new Error("更新文件超过大小限制");
     return Buffer.concat(chunks);
   }
   throw new Error("更新下载重定向次数过多");

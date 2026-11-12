@@ -6,6 +6,7 @@ const { spawn } = require("child_process");
 const config = require("../core/config");
 const { read, atomic, root, installation, newer, sleep } = require("./common");
 const release = require("./release");
+const net = require("./net");
 const operations = require("../core/operations");
 const stateFile = () => path.join(config.dataDir(), "update-state.json");
 const terminal = new Set(["completed", "rolled-back", "failed", "recovered"]);
@@ -61,8 +62,10 @@ async function start(version) {
   if (lock && operations.alive(lock.pid)) return status();
   const id = crypto.randomUUID();
   const out = fs.openSync(path.join(config.dataDir(), "update.log"), "a", 0o600);
+  // The worker runs from the stable launcher, which may predate the
+  // proxy-aware transport; workerEnv gives it the same route.
   const child = spawn(process.execPath, [path.join(install.root, "launcher/src/update/worker.js"), id, version], {
-    detached: true, stdio: ["ignore", out, out], env: { ...process.env, DOTJAR_HOME: config.dataDir(), DOTJAR_INSTALL_ROOT: install.root },
+    detached: true, stdio: ["ignore", out, out], env: { ...process.env, ...net.workerEnv(), DOTJAR_HOME: config.dataDir(), DOTJAR_INSTALL_ROOT: install.root },
   });
   fs.closeSync(out);
   await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
