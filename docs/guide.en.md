@@ -78,6 +78,8 @@ dotjar service install
 
 Do this once and it starts at login from then on, so all you do is open the bookmark. Undo it with `dotjar service uninstall`. (It can be set up through `npx` too, but then it points into npx's cache and stops working when the cache is cleared.)
 
+To remove it, run `dotjar uninstall`. It lists the program files, command entry and login item it would remove and asks before doing anything; your records and notes stay. Add `--purge` to move the data folder to the Trash as well. Details are in [installation and updates](updates.md#卸载) (Chinese).
+
 For source development, use `npm run dev`. It runs in the foreground with separate data and an automatically assigned port; press Ctrl+C to stop it. Demo data is the default. See [development and installation checks](development.md) (Chinese) for enabling real records, model calls or installer verification. Development instances do not register login services.
 
 Why it isn't a plain page you can double-click: it has to read the agents' records on your machine and write notes into a folder. A page in a browser can do neither on its own, so a small server listening only on this machine (`127.0.0.1`) sits behind it.

@@ -24,7 +24,7 @@
     "service": "node bin/dotjar.js service install",
     "service:off": "node bin/dotjar.js service uninstall",
     "demo": "node bin/dotjar.js demo",
-    "veil": "electron .",
+    "veil": "electron . --daily",
     "veil:demo": "electron . --demo",
     "scan": "node bin/dotjar.js scan",
     "distill": "node bin/dotjar.js distill",
@@ -33,6 +33,7 @@
     "shot": "electron . --demo --shot",
     "icon": "electron scripts/make-icon.js",
     "dev": "node scripts/dev.js",
+    "dev:clean": "node scripts/dev-clean.js",
     "verify:install": "node scripts/verify-install.js"
   },
   "engines": {

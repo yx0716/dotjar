@@ -22,6 +22,8 @@ const USAGE = `用法：dotjar [命令]
   demo          用演示数据看看样子，不读本机任何东西
   stop          停掉后台的服务
   service       install：登录时自动启动，之后只用开收藏夹   uninstall：取消   status：看看现在怎样
+  uninstall     删除程序、命令入口和登录启动项，保留记录和笔记；先列出要做的事，确认后才执行
+                --purge 连数据目录一起移到废纸篓  --yes 不再询问  --entry-dir <命令目录>
 
   scan          扫描今天：有多少段工作，agent 已经写下了什么
   digest        打印会交给模型的材料
@@ -52,10 +54,7 @@ async function main() {
   const cmd = !first || first.startsWith("--port") || first === "--no-open" || first === "--foreground" ? "web" : first;
   // A source checkout must opt into its own data context. A bare npm start
   // must never silently become the customer's production installation.
-  const sourceCheckout = require("fs").existsSync(require("path").resolve(__dirname, "../.git"));
-  if (sourceCheckout && !process.env.DOTJAR_PROFILE && !process.env.DOTJAR_HOME && !process.env.STRATA_HOME && !["help", "--help", "-h", "--version", "-v", "demo"].includes(cmd)) {
-    throw new Error("这是开发源码，请用 npm run dev 启动隔离环境；客户版请使用已安装的 dotjar 入口");
-  }
+  if (!["help", "--help", "-h", "--version", "-v", "demo"].includes(cmd)) require("../src/core/instance").assertIsolatedSource(require("path").resolve(__dirname, ".."));
   const cfg = config.load();
 
   if (cmd === "help" || cmd === "--help" || cmd === "-h") {
@@ -67,8 +66,8 @@ async function main() {
     return;
   }
 
+  const option = (name) => { const i = process.argv.indexOf(name); if (i === -1) return undefined; if (!process.argv[i + 1] || process.argv[i + 1].startsWith("--")) throw new Error(`${name} 缺少值`); return process.argv[i + 1]; };
   if (cmd === "install-managed") {
-    const option = (name) => { const i = process.argv.indexOf(name); if (i === -1) return undefined; if (!process.argv[i + 1] || process.argv[i + 1].startsWith("--")) throw new Error(`${name} 缺少值`); return process.argv[i + 1]; };
     const result = await require("../src/update/install").install({ version: option("--version"), entryDir: option("--entry-dir") });
     line(`已安装 ${result.version}：${result.entry}，请确保 ~/.local/bin 在 PATH 中。`);
     line(result.output);
@@ -198,6 +197,39 @@ async function main() {
       const now = await service.running();
       line(`登录时自动启动：${service.installed() ? "是" : "否"}`);
       line(now ? `正在运行：http://127.0.0.1:${now.port}/` : "现在没有在跑。");
+    }
+    return;
+  }
+
+  if (cmd === "uninstall") {
+    const uninstall = require("../src/uninstall");
+    const args = process.argv.slice(3);
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === "--entry-dir") i++;
+      else if (!["--purge", "--yes"].includes(args[i])) throw new Error(`用法：${again("uninstall")} [--purge] [--yes] [--entry-dir <命令目录>]`);
+    }
+    const entryDir = option("--entry-dir");
+    const options = { purge: args.includes("--purge"), ...(entryDir ? { entryDir: require("path").resolve(entryDir) } : {}) };
+    const plan = uninstall.plan(options);
+    for (const l of uninstall.describe(plan)) line(l);
+    if (plan.empty || plan.blockers.length) {
+      if (plan.blockers.length) process.exitCode = 1;
+      return;
+    }
+    if (!args.includes("--yes")) {
+      if (!process.stdin.isTTY) throw new Error(`没有改动。确认无误后运行：${again(["uninstall", ...args, "--yes"].join(" "))}`);
+      const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise((resolve) => rl.question("继续卸载？[y/N] ", resolve));
+      rl.close();
+      if (!/^y(es)?$/i.test(answer.trim())) {
+        line("已取消，没有改动。");
+        return;
+      }
+    }
+    for (const l of await uninstall.execute(plan, options)) line(l);
+    if (plan.manual.length) {
+      line("还需要你自己完成：");
+      for (const s of plan.manual) line(`  ${s}`);
     }
     return;
   }
