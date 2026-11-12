@@ -186,7 +186,9 @@ test("several days can be gone through in one go, one after another", async () =
     const { createSession } = require("../src/core/session");
     const session = createSession({ language: "zh" });
     const running = session.distill(["2026-06-03", "2026-06-01", "2026-06-02", "2026-06-03", "nonsense"]);
-    assert.deepEqual(session.isDistilling(), { done: 0, total: 3, day: "2026-06-01" });
+    const { done, total, day, status, id } = session.isDistilling();
+    assert.deepEqual({ done, total, day }, { done: 0, total: 3, day: "2026-06-01" });
+    assert.equal(status, "running"); assert.ok(id);
     const res = await running;
     assert.deepEqual(asked, ["2026-06-01", "2026-06-02", "2026-06-03"], "oldest first, each once");
     assert.deepEqual([res.days, res.found, res.failed.map((f) => [f.day, f.code])], [3, 4, [["2026-06-02", "NO_WORK"]]]);

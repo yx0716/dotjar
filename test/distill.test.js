@@ -94,7 +94,7 @@ test("the configured engine decides which runner is used", async () => {
 
   await assert.rejects(d.distill({ ...base, config: { engine: "openai", api: { baseUrl: "", model: "" } } }), (err) => err.code === "NO_API");
 
-  assert.deepEqual(d.apiSettings({ api: { baseUrl: "https://x/v1///", model: "m", apiKey: "inline" } }), { baseUrl: "https://x/v1", model: "m", apiKey: "inline" });
+  assert.deepEqual(d.apiSettings({ api: { baseUrl: "https://x/v1///", model: "m", apiKey: "inline" } }), { baseUrl: "https://x/v1", model: "m", apiKey: "inline", stream: true });
   process.env.DOTJAR_TEST_KEY = "from-env";
   assert.equal(d.apiSettings({ api: { apiKeyEnv: "DOTJAR_TEST_KEY", apiKey: "inline" } }).apiKey, "from-env");
   delete process.env.DOTJAR_TEST_KEY;

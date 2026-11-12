@@ -268,6 +268,7 @@ async function distillToday(cfg = config.load(), options = {}) {
     language: options.language,
     signal: options.signal,
     run: options.run,
+    onProgress: options.onProgress ? (items) => options.onProgress(items.filter((item) => !pendingIds.has(item.id) && !before.items.some((old) => old.id === item.id))) : undefined,
   });
   try {
     // Reload: the person may have kept or skipped something while this ran.
