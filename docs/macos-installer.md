@@ -19,14 +19,13 @@
 - 如果 `~/.local/bin/dotjar` 不存在，会创建命令行入口；已有同名文件或符号链接不会被覆盖。
 - 初始化失败会移除本次暂存文件，不删除用户数据。已有不完整安装会报告错误，保留现场，不把整个目录当作可清理垃圾。
 
-关闭浏览器或移除 `.app` 不会停止已经启动的后台服务。需要卸载时，先执行：
+关闭浏览器或移除 `.app` 不会停止已经启动的后台服务。需要卸载时运行：
 
 ```sh
-~/.local/bin/dotjar service uninstall &&
-~/.local/bin/dotjar stop
+~/.local/bin/dotjar uninstall
 ```
 
-然后将「应用程序」中的 dotjar 移到废纸篓。若要移除个人程序文件，可删除 `~/.local/share/dotjar` 和 `~/.local/bin/dotjar`；**不要删除 `~/.dotjar` 或旧 `~/.strata`，除非确实要清空记录和设置**。当前仍需命令行停止/卸载后台服务，图形卸载入口尚未实现。
+它先列出要做的事，确认后取消登录自启、停止后台服务，删除 `~/.local/share/dotjar`、`~/.local/bin/dotjar` 和 npx 缓存里的 dotjar；记录、设置和笔记保留。然后按清单最后的提示，把「应用程序」中的 dotjar 移到废纸篓，并用 `sudo pkgutil --forget com.dotjar.installer.<arm64|x64>` 删除安装包记录（两步都需要管理员权限）。连记录和设置一起清空时加 `--purge`，数据目录会移到废纸篓。旧版本没有这个命令时，用 `npx github:yx0716/dotjar uninstall`。图形卸载入口尚未实现；详见[安装与更新](updates.md#卸载)。
 
 ## 构建与验证
 

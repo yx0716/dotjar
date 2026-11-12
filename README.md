@@ -73,7 +73,9 @@ dotjar update install
 dotjar update status
 ```
 
-完整的安装、迁移、发布和恢复说明见 [安装与更新](docs/updates.md)。可选定时捕捞和账号剩余额度仍未实现。
+不用了运行 `dotjar uninstall`：确认后删除程序、命令入口和登录自启，记录和笔记保留；加 `--purge` 连数据一起移到废纸篓。
+
+完整的安装、迁移、发布、卸载和恢复说明见 [安装与更新](docs/updates.md)。可选定时捕捞和账号剩余额度仍未实现。
 
 ## 配个桌宠
 

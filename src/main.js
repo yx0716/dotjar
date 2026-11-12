@@ -34,6 +34,19 @@ const SMOKE = argv.includes("--smoke"); // start everything, show nothing, repor
 const HEADLESS = Boolean(SHOT) || SMOKE;
 const isMac = process.platform === "darwin";
 
+// The veil only runs from a clone, and `npm run veil` is meant to share the
+// daily data with the web version; it says so with --daily. Any other start
+// from a source checkout (a bare `electron .`) must not quietly act on that
+// data. Demo, screenshot and smoke runs keep to themselves.
+if (!HEADLESS && !DEMO && !argv.includes("--daily")) {
+  try {
+    require("./core/instance").assertIsolatedSource(path.join(__dirname, ".."));
+  } catch {
+    dialog.showErrorBox("dotjar", "从源码启动桌面壳会读写日常数据。当日常版用：npm run veil；只看样子：npm run veil:demo");
+    process.exit(1);
+  }
+}
+
 let win = null;
 let tray = null;
 let cfg = config.load();

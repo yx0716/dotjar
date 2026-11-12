@@ -73,7 +73,9 @@ dotjar update install
 dotjar update status
 ```
 
-See [installation, migration and publishing](docs/updates.md) (Chinese) for details. Scheduled catches and account quota display are not implemented.
+To remove it, run `dotjar uninstall`: after you confirm, it removes the program, command entry and login item and keeps your records and notes; `--purge` moves the data to the Trash too.
+
+See [installation, migration, publishing and removal](docs/updates.md) (Chinese) for details. Scheduled catches and account quota display are not implemented.
 
 ## With a desktop pet
 
